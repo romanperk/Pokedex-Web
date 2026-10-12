@@ -1,0 +1,459 @@
+.detail-page {
+  --pokemon-color: #76c850;
+  background: linear-gradient(
+    125deg,
+    color-mix(in srgb, var(--pokemon-color) 83%, white),
+    color-mix(in srgb, var(--pokemon-color) 66%, white)
+  );
+  min-height: calc(100vh - 76px);
+  padding-top: 1px;
+  position: relative;
+  overflow: hidden;
+}
+.detail-top {
+  position: relative;
+  min-height: 465px;
+}
+.crumb-light {
+  color: #4e5b536b;
+}
+.crumb-light button,
+.crumb-light b {
+  color: #334034a8;
+}
+.detail-title {
+  display: flex;
+  align-items: start;
+  justify-content: space-between;
+  position: relative;
+  z-index: 3;
+  margin-top: 28px;
+}
+.detail-kicker {
+  font-size: 10px;
+  letter-spacing: 1.6px;
+  font-weight: 700;
+  color: #344238a8;
+}
+.detail-title h1 {
+  font-size: clamp(42px, 7vw, 70px);
+  letter-spacing: -3px;
+  line-height: 1;
+  margin: 13px 0 16px;
+  color: #202b25;
+}
+.detail-title h1 span {
+  color: #fff9;
+}
+.detail-types {
+  display: flex;
+  gap: 7px;
+}
+.detail-top .crumb .save-pokemon {
+  position: static;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  min-height: 40px;
+  margin-left: auto;
+  padding: 7px 12px;
+  border: 1px solid #ffffff91;
+  border-radius: 9px;
+  background: #ffffff63;
+  color: #354239;
+  font-size: 12px;
+  font-weight: 650;
+  cursor: pointer;
+}
+.detail-top .crumb .save-pokemon:hover,
+.detail-top .crumb .save-pokemon[aria-pressed='true'] {
+  background: #ffffffd9;
+  color: #8d293b;
+}
+.detail-type {
+  background: #ffffff63;
+  border: 1px solid #ffffff78;
+  border-radius: 20px;
+  padding: 6px 13px;
+  text-transform: capitalize;
+  font-size: 11px;
+  font-weight: 650;
+  color: #354239;
+}
+.detail-number {
+  font:
+    600 25px ui-monospace,
+    monospace;
+  color: #39483a80;
+  padding-top: 10px;
+}
+.detail-image-wrap {
+  position: absolute;
+  z-index: 2;
+  inset: 32px 0 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  pointer-events: none;
+}
+.detail-image-wrap img {
+  height: 365px;
+  width: min(390px, 90vw);
+  object-fit: contain;
+  filter: drop-shadow(0 20px 15px #2c382528);
+  position: relative;
+  z-index: 1;
+}
+.detail-image-ring {
+  position: absolute;
+  width: 290px;
+  height: 290px;
+  border-radius: 50%;
+  background: #ffffff3b;
+  top: 57px;
+}
+.detail-image-star {
+  position: absolute;
+  color: #fff9;
+  font-size: 26px;
+}
+.star-left {
+  left: 25%;
+  top: 100px;
+}
+.star-right {
+  right: 24%;
+  top: 170px;
+}
+.detail-footnote {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 24px;
+  display: flex;
+  justify-content: space-between;
+  font-size: 9px;
+  font-weight: 650;
+  letter-spacing: 1.5px;
+  color: #40504180;
+}
+.detail-content {
+  position: relative;
+  z-index: 3;
+  background: #fff;
+  border-radius: 32px 32px 0 0;
+  padding: 35px 24px 0;
+  min-height: 400px;
+}
+.detail-content-inner {
+  width: min(930px, 100%);
+  margin: auto;
+}
+.fact-block {
+  max-width: 650px;
+  margin-bottom: 30px;
+}
+.content-label {
+  font-size: 9px;
+  font-weight: 750;
+  letter-spacing: 1.5px;
+  color: #9299a2;
+}
+.fact-block h2,
+.profile-section h2,
+.content-heading h2 {
+  font-size: 22px;
+  letter-spacing: -0.5px;
+  margin: 8px 0 8px;
+}
+.fact-block p {
+  font-size: 13px;
+  line-height: 1.75;
+  color: #68717b;
+  max-width: 650px;
+}
+.detail-columns {
+  display: grid;
+  grid-template-columns: 1fr 0.83fr;
+  gap: 58px;
+  padding-top: 7px;
+}
+.content-heading {
+  display: flex;
+  align-items: end;
+  justify-content: space-between;
+  margin-bottom: 15px;
+}
+.content-heading h2 {
+  margin-bottom: 0;
+}
+.stat-total {
+  font-size: 9px;
+  letter-spacing: 1px;
+  color: #969da5;
+}
+.stat-total b {
+  font:
+    600 12px ui-monospace,
+    monospace;
+  color: #515b65;
+  margin-left: 5px;
+}
+.stat-row {
+  display: grid;
+  grid-template-columns: 100px 32px 1fr;
+  align-items: center;
+  gap: 11px;
+  margin: 13px 0;
+}
+.stat-row > span {
+  text-transform: capitalize;
+  font-size: 11px;
+  color: #777f89;
+}
+.stat-row > b {
+  font:
+    600 11px ui-monospace,
+    monospace;
+  color: #404954;
+}
+.stat-track {
+  height: 5px;
+  background: #eff0f2;
+  border-radius: 8px;
+  overflow: hidden;
+}
+.stat-track i {
+  display: block;
+  height: 100%;
+  background: var(--pokemon-color);
+  border-radius: 8px;
+}
+.profile-section h2 {
+  margin-bottom: 15px;
+}
+.profile-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 8px;
+}
+.profile-item {
+  border-radius: 9px;
+  background: #f6f7f8;
+  padding: 12px 10px;
+  display: grid;
+  gap: 7px;
+}
+.profile-item span {
+  font-size: 8px;
+  letter-spacing: 1px;
+  color: #949ba4;
+}
+.profile-item b {
+  font-size: 15px;
+}
+.profile-item small {
+  font-size: 10px;
+  color: #777f89;
+  font-weight: 500;
+}
+.ability-heading {
+  font-size: 13px;
+  font-weight: 700;
+  margin: 21px 0 10px;
+}
+.ability-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 7px;
+}
+.ability-list > span {
+  padding: 7px 10px;
+  background: #f5f6f7;
+  border-radius: 16px;
+  font-size: 10px;
+}
+.ability-list small {
+  margin-left: 6px;
+  color: #969da5;
+  font-size: 7px;
+  letter-spacing: 0.6px;
+}
+.detail-navigation {
+  border-top: 1px solid #eff0f2;
+  margin-top: 32px;
+  padding: 17px 0 25px;
+  display: flex;
+  justify-content: space-between;
+  gap: 10px;
+}
+.detail-navigation button {
+  background: none;
+  border: 0;
+  color: #69727d;
+  font-size: 11px;
+  cursor: pointer;
+}
+.detail-navigation button:hover {
+  color: var(--red);
+}
+.detail-loading {
+  padding-top: 100px;
+  text-align: center;
+  color: #485749;
+}
+@media (max-width: 900px) {
+  .detail-columns {
+    gap: 32px;
+  }
+}
+@media (max-width: 650px) {
+  .detail-page {
+    min-height: calc(100vh - 62px);
+  }
+  .detail-top {
+    min-height: 415px;
+  }
+  .detail-title {
+    margin-top: 25px;
+  }
+  .detail-title h1 {
+    font-size: 50px;
+  }
+  .detail-number {
+    font-size: 18px;
+  }
+  .detail-image-wrap {
+    inset: 40px 0 0;
+  }
+  .detail-image-wrap img {
+    height: 310px;
+    width: min(330px, 93vw);
+  }
+  .detail-image-ring {
+    width: 235px;
+    height: 235px;
+    top: 64px;
+  }
+  .star-left {
+    left: 14%;
+    top: 130px;
+  }
+  .star-right {
+    right: 14%;
+    top: 115px;
+  }
+  .detail-footnote {
+    bottom: 20px;
+  }
+  .detail-content {
+    border-radius: 25px 25px 0 0;
+    padding: 28px 19px 0;
+  }
+  .detail-columns {
+    grid-template-columns: 1fr;
+    gap: 29px;
+  }
+  .fact-block {
+    margin-bottom: 25px;
+  }
+  .detail-navigation {
+    margin-top: 25px;
+  }
+  .detail-navigation button {
+    font-size: 10px;
+  }
+  .detail-navigation button:nth-child(2) {
+    display: none;
+  }
+  .profile-grid {
+    gap: 7px;
+  }
+  .profile-item {
+    padding: 11px 8px;
+  }
+}
+@media (max-width: 370px) {
+  .stat-row {
+    grid-template-columns: 88px 26px 1fr;
+    gap: 8px;
+  }
+}
+.detail-navigation a {
+  color: #69727d;
+  text-decoration: none;
+  font-size: 11px;
+}
+.detail-navigation a:hover {
+  color: var(--red);
+}
+.detail-navigation a[aria-disabled='true'] {
+  opacity: 0.45;
+}
+.detail-page-loading {
+  min-height: calc(100vh - 76px);
+  padding-top: 1px;
+}
+@media (max-width: 650px) {
+  .detail-page-loading {
+    min-height: calc(100vh - 62px);
+  }
+}
+
+@media (max-width: 650px) {
+  .detail-content {
+    margin-top: -48px;
+  }
+  .detail-footnote {
+    bottom: 68px;
+  }
+}
+@media (min-width: 651px) {
+  .detail-content {
+    margin-top: -54px;
+  }
+  .detail-footnote {
+    bottom: 78px;
+  }
+}
+.detail-top > .crumb {
+  padding-top: 10px;
+  padding-bottom: 12px;
+}
+.detail-top {
+  min-height: 425px;
+}
+.detail-title {
+  margin-top: 14px;
+}
+.detail-image-wrap {
+  inset: 24px 0 0;
+}
+.detail-content {
+  margin-top: -40px;
+}
+.detail-footnote {
+  bottom: 65px;
+}
+@media (max-width: 650px) {
+  .detail-top {
+    min-height: 370px;
+  }
+  .detail-top > .crumb {
+    padding-top: 8px;
+    padding-bottom: 10px;
+  }
+  .detail-title {
+    margin-top: 12px;
+  }
+  .detail-image-wrap {
+    inset: 25px 0 0;
+  }
+  .detail-content {
+    margin-top: -34px;
+  }
+  .detail-footnote {
+    bottom: 48px;
+  }
+}

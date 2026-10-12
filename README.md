@@ -1,32 +1,58 @@
-# React + TypeScript + Vite
+# Pokédex Web
 
-This template provides a minimal setup to get React working in Vite with HMR and some Oxlint rules.
+A responsive, installable Pokédex and Pokémon reference app built with React and TypeScript. Browse Pokémon, follow linked reference data, compare base stats, check type effectiveness, and keep a personal collection in your browser.
 
-Currently, two official plugins are available:
+## Getting started
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Oxc](https://oxc.rs)
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/)
+Requirements: Node.js and npm.
 
-## React Compiler
-
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
-
-## Expanding the Oxlint configuration
-
-If you are developing a production application, we recommend enabling type-aware lint rules by installing `oxlint-tsgolint` and editing `.oxlintrc.json`:
-
-```json
-{
-  "$schema": "./node_modules/oxlint/configuration_schema.json",
-  "plugins": ["react", "typescript", "oxc"],
-  "options": {
-    "typeAware": true
-  },
-  "rules": {
-    "react/rules-of-hooks": "error",
-    "react/only-export-components": ["warn", { "allowConstantExport": true }]
-  }
-}
+```sh
+npm install
+npm run dev
 ```
 
-See the [Oxlint rules documentation](https://oxc.rs/docs/guide/usage/linter/rules) for the full list of rules and categories.
+Vite prints the local development URL when the server starts. The app uses PokéAPI for reference data, so browsing data requires an internet connection unless it is already available in the browser's cache.
+
+## Features
+
+- **Discover:** entry point for the Pokédex, tools, collection, and implemented reference catalogs.
+- **Pokédex:** browse and filter Pokémon, then open detailed species pages with forms, evolution, learnsets, and game-version encounter records where PokéAPI provides them.
+- **Global search:** search Pokémon, moves, abilities, items, and types. Press **Ctrl+K** (or **Command+K** on macOS) to open search.
+- **Reference library:** browse moves, abilities, items, and types, with links between related records.
+- **Tools:** inspect type effectiveness against one or two defending types and compare up to three Pokémon using base stats, types, and abilities.
+- **My Pokémon:** keep an owned-Pokémon inventory, search and sort it, and export or import a JSON backup.
+- **PWA support:** install where the browser provides an install prompt. The service worker caches app assets and a limited set of API responses and artwork.
+
+## Routes
+
+| Route                                                              | Page                     |
+| ------------------------------------------------------------------ | ------------------------ |
+| `/`                                                                | Discover                 |
+| `/pokedex`                                                         | Pokémon list and filters |
+| `/pokemon/:name`                                                   | Pokémon details          |
+| `/search?q=...`                                                    | Global search            |
+| `/moves`, `/abilities`, `/items`, `/types`                         | Reference catalogs       |
+| `/moves/:name`, `/abilities/:name`, `/items/:name`, `/types/:name` | Reference details        |
+| `/tools`                                                           | Tools directory          |
+| `/tools/type-effectiveness`                                        | Type effectiveness       |
+| `/tools/compare`                                                   | Pokémon comparison       |
+| `/my-pokemon`                                                      | Local collection         |
+
+## Local collection and data scope
+
+Owned Pokémon records are stored in this browser's local storage. They are not tied to an account, do not sync between devices, and may be removed when browser site data is cleared. Use the collection's JSON export to keep a backup or move records to another browser. Earlier local collections and version 1 backups are migrated into the owned inventory.
+
+PokéAPI is the read-only source for Pokémon and reference data. Learnset and encounter coverage depends on the upstream records; an absent result does not prove that a Pokémon or move is unavailable in a game. The comparison tool reports base stats, not trained or battle-modified stats. This app does not determine competitive legality or provide a damage simulator.
+
+## Development commands
+
+```sh
+npm run dev          # Start the Vite development server
+npm run build        # Type-check and create a production build in dist/
+npm run preview      # Serve the production build locally
+npm run lint         # Lint application source and Vite configuration
+npm run format:check # Check formatting with Prettier
+npm run format       # Format files with Prettier
+```
+
+The production build includes the PWA manifest and service worker generated by `vite-plugin-pwa`.

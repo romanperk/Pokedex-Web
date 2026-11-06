@@ -17,6 +17,8 @@ export default function App() {
       return
     }
     registerSW({ immediate: true })
+    // Holds opaque responses from before images used CORS; serving one makes the image fail to load.
+    void caches.delete('pokemon-artwork').catch(() => undefined)
   }, [])
   return (
     <QueryClientProvider client={queryClient}>

@@ -70,7 +70,8 @@ export default defineConfig({
             urlPattern: /^https:\/\/raw\.githubusercontent\.com\/PokeAPI\/sprites\//,
             handler: 'CacheFirst',
             options: {
-              cacheName: 'pokemon-artwork',
+              // Renamed from the retired cache in App.tsx, whose opaque entries fail CORS requests.
+              cacheName: 'pokemon-artwork-cors',
               expiration: { maxEntries: 150, maxAgeSeconds: 30 * DAY, purgeOnQuotaError: true },
               cacheableResponse: { statuses: [200] },
             },

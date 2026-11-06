@@ -198,3 +198,15 @@
     transition-duration: 0.01ms !important;
   }
 }
+
+/* Hide scrollbars on touch devices (phones/tablets); scrolling still works */
+@media (pointer: coarse) {
+  html,
+  body {
+    scrollbar-width: none;
+  }
+  html::-webkit-scrollbar,
+  body::-webkit-scrollbar {
+    display: none;
+  }
+}

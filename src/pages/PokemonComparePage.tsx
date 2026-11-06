@@ -1,258 +1,276 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { useQueries, useQuery } from '@tanstack/react-query'
-import { Link } from 'react-router-dom'
+import { Plus, Search, X } from 'lucide-react'
+import { Link, useSearchParams } from 'react-router-dom'
+import { TopBar } from '../components/common/TopBar'
+import { EmptyState, ErrorState, PokemonSprite, TypeBadge } from '../components/ui'
 import {
   getPokemon,
   getPokemonPage,
+  paddedId,
+  pokemonIdFromUrl,
   pokemonKeys,
+  statLabel,
   titleCase,
-  TYPE_COLORS,
+  type Pokemon,
 } from '../lib/pokeapi/client'
-import type { Pokemon } from '../lib/pokeapi/client'
+import { MAX_COMPARE, readComparison, saveComparison } from '../features/pokedex/comparison'
+import { usePageTitle } from '../lib/usePageTitle'
 
-const COMPARE_STORAGE_KEY = 'pokedex:comparison:v1'
-const MAX_COMPARE = 3
-
-function initialSelection(): string[] {
-  try {
-    const parsed: unknown = JSON.parse(localStorage.getItem(COMPARE_STORAGE_KEY) ?? '[]')
-    if (Array.isArray(parsed))
-      return [
-        ...new Set(
-          parsed.filter(
-            (value): value is string => typeof value === 'string' && /^[a-z0-9-]+$/.test(value),
-          ),
-        ),
-      ].slice(0, MAX_COMPARE)
-  } catch {
-    // The comparison is still usable for this session if storage is unavailable.
-  }
-  return []
+function initialSelection(add: string | null): string[] {
+  const stored = readComparison()
+  if (add && /^[a-z0-9-]+$/.test(add) && !stored.includes(add))
+    return [...stored.slice(0, MAX_COMPARE - 1), add]
+  return stored
 }
 
-function ComparisonHeader({ pokemon, name }: { pokemon?: Pokemon; name: string }) {
-  return (
-    <th scope="col">
-      {pokemon ? (
-        <Link className="compare-pokemon-name" to={`/pokemon/${pokemon.name}`}>
-          {titleCase(pokemon.name)}
-        </Link>
-      ) : (
-        titleCase(name)
-      )}
-    </th>
-  )
-}
 export function PokemonComparePage() {
+  usePageTitle('Compare Pokémon')
+  const [searchParams, setSearchParams] = useSearchParams()
+  const [selection, setSelection] = useState(() => initialSelection(searchParams.get('add')))
+  const [term, setTerm] = useState('')
+
   useEffect(() => {
-    document.title = 'Compare Pokémon | Pokédex'
-    return () => {
-      document.title = 'Pokédex — Discover Pokémon'
-    }
-  }, [])
-  const [selection, setSelection] = useState<string[]>(initialSelection)
+    if (searchParams.has('add')) setSearchParams({}, { replace: true })
+  }, [searchParams, setSearchParams])
+  useEffect(() => saveComparison(selection), [selection])
+
+  const full = selection.length >= MAX_COMPARE
   const directory = useQuery({
     queryKey: pokemonKeys.directory,
     queryFn: ({ signal }) => getPokemonPage(0, 2000, signal),
+    enabled: !full,
     staleTime: 1000 * 60 * 60 * 24,
   })
   const details = useQueries({
     queries: selection.map((name) => ({
       queryKey: pokemonKeys.detail(name),
-      queryFn: ({ signal }) => getPokemon(name, signal),
+      queryFn: ({ signal }: { signal: AbortSignal }) => getPokemon(name, signal),
       staleTime: 1000 * 60 * 60 * 12,
     })),
   })
-  useEffect(() => {
-    try {
-      localStorage.setItem(COMPARE_STORAGE_KEY, JSON.stringify(selection))
-    } catch {
-      /* Keep current selections in memory. */
-    }
-  }, [selection])
-  const resources = directory.data?.results ?? []
-  const loaded = details.map((query) => query.data)
-  const statNames = loaded.find(Boolean)?.stats.map((stat) => stat.stat.name) ?? []
-  function setSlot(slot: number, name: string) {
-    setSelection((current) => {
-      const next = [...current]
-      if (!name) next.splice(slot, 1)
-      else if (!next.includes(name)) next[slot] = name
-      return next.filter(Boolean).slice(0, MAX_COMPARE)
-    })
+  const suggestions = useMemo(() => {
+    const normalized = term.trim().toLowerCase().replace(/\s+/g, '-').replace(/^#/, '')
+    if (!normalized || !directory.data) return []
+    const numericId = /^\d+$/.test(normalized) ? Number(normalized) : null
+    return directory.data.results
+      .filter(
+        (resource) =>
+          !selection.includes(resource.name) &&
+          (resource.name.includes(normalized) || pokemonIdFromUrl(resource.url) === numericId),
+      )
+      .sort(
+        (a, b) =>
+          Number(!a.name.startsWith(normalized)) - Number(!b.name.startsWith(normalized)) ||
+          pokemonIdFromUrl(a.url) - pokemonIdFromUrl(b.url),
+      )
+      .slice(0, 6)
+  }, [directory.data, selection, term])
+
+  function add(name: string) {
+    setSelection((current) => [...current, name].slice(0, MAX_COMPARE))
+    setTerm('')
   }
 
+  const loaded = details.flatMap((query) => (query.data ? [query.data] : []))
+  const statNames = loaded[0]?.stats.map((stat) => stat.stat.name) ?? []
+  const columns = { '--columns': selection.length } as React.CSSProperties
+
   return (
-    <main className="page-width utility-page">
-      <div className="crumb">
-        <Link to="/">Discover</Link>
-        <span>/</span>
-        <Link to="/tools">Tools</Link>
-        <span>/</span>
-        <b>Compare Pokémon</b>
-      </div>
-      <header className="utility-heading">
-        <div className="eyebrow">TOOLS</div>
-        <h1>
-          Compare Pokémon<span>.</span>
-        </h1>
-        <p>
-          Compare the same base stats, types, and abilities side by side. Base stats are species
-          data; they do not include level, nature, training, or battle effects.
-        </p>
-        <Link className="tool-switch-link" to="/tools/type-effectiveness">
-          Type effectiveness <span aria-hidden="true">→</span>
-        </Link>
-      </header>
-      <section className="type-chart-panel" aria-labelledby="compare-selection-heading">
-        <h2 id="compare-selection-heading">Choose up to {MAX_COMPARE} Pokémon</h2>
-        {directory.isLoading && (
-          <p role="status" className="muted">
-            Loading Pokédex names…
-          </p>
-        )}
-        {directory.isError && !directory.data && (
-          <div className="error-box" role="alert">
-            Pokédex names could not be loaded.
-            <button onClick={() => void directory.refetch()}>Retry</button>
-          </div>
-        )}
-        {directory.data && (
-          <div className="compare-selectors">
-            {Array.from({ length: MAX_COMPARE }, (_, slot) => (
-              <label key={slot}>
-                {slot === 0
-                  ? 'First Pokémon'
-                  : slot === 1
-                    ? 'Second Pokémon'
-                    : 'Third Pokémon (optional)'}
-                <select
-                  value={selection[slot] ?? ''}
-                  disabled={slot > selection.length}
-                  onChange={(event) => setSlot(slot, event.target.value)}
-                >
-                  <option value="">{slot < 2 ? 'Choose a Pokémon' : 'None'}</option>
-                  {resources.map((resource) => (
-                    <option
-                      key={resource.name}
-                      value={resource.name}
-                      disabled={
-                        selection.includes(resource.name) && selection[slot] !== resource.name
-                      }
-                    >
-                      {titleCase(resource.name)}
-                    </option>
-                  ))}
-                </select>
-              </label>
-            ))}
-          </div>
-        )}
-        {!!selection.length && (
-          <button className="secondary-button" type="button" onClick={() => setSelection([])}>
-            Clear comparison
-          </button>
-        )}
-        {!selection.length && (
-          <p className="muted" role="status">
-            Choose two or more Pokémon to compare their profiles.
-          </p>
-        )}
-        {details.some((query) => query.isError && !query.data) && (
-          <div className="error-box" role="alert">
-            Some Pokémon details could not be loaded.
-            {details.map((query, index) =>
-              query.isError && !query.data ? (
-                <button key={selection[index]} onClick={() => void query.refetch()}>
-                  Retry {titleCase(selection[index])}
-                </button>
-              ) : null,
+    <main className="page compare">
+      <TopBar title="Compare Pokémon" back="/tools" />
+      <div className="page-body">
+        {!full && (
+          <div className="compare-picker">
+            <label className="search-field">
+              {selection.length ? (
+                <Plus size={20} aria-hidden="true" />
+              ) : (
+                <Search size={20} aria-hidden="true" />
+              )}
+              <input
+                type="search"
+                enterKeyHint="search"
+                autoComplete="off"
+                autoCorrect="off"
+                aria-label="Add a Pokémon to compare"
+                placeholder={selection.length ? 'Add another Pokémon' : 'Add a Pokémon'}
+                value={term}
+                onChange={(event) => setTerm(event.target.value)}
+              />
+            </label>
+            {directory.isError && !directory.data && term && (
+              <ErrorState
+                message="Pokémon names could not load."
+                onRetry={() => void directory.refetch()}
+              />
+            )}
+            {suggestions.length > 0 && (
+              <ul className="list">
+                {suggestions.map((resource) => {
+                  const id = pokemonIdFromUrl(resource.url)
+                  return (
+                    <li key={resource.name}>
+                      <button type="button" className="list-row" onClick={() => add(resource.name)}>
+                        <PokemonSprite id={id} className="list-sprite" />
+                        <span className="list-text">
+                          <strong>{titleCase(resource.name)}</strong>
+                          <small className="dex-number">{paddedId(id)}</small>
+                        </span>
+                        <Plus className="list-chevron" size={18} aria-hidden="true" />
+                      </button>
+                    </li>
+                  )
+                })}
+              </ul>
             )}
           </div>
         )}
-        {!!selection.length && (
-          <div className="comparison-table-wrap">
-            <table className="comparison-table">
-              <thead>
-                <tr>
-                  <th scope="col">Profile</th>
-                  {selection.map((name, index) => (
-                    <ComparisonHeader key={name} name={name} pokemon={details[index]?.data} />
+
+        {selection.length === 0 ? (
+          <EmptyState title="Nothing to compare yet">
+            Add up to three Pokémon to see their base stats, types and abilities side by side.
+          </EmptyState>
+        ) : (
+          <div className="compare-table">
+            <div className="compare-grid compare-header" style={columns}>
+              {selection.map((name, index) => {
+                const pokemon = details[index]?.data
+                return (
+                  <div className="compare-pokemon" key={name}>
+                    <button
+                      type="button"
+                      className="icon-button compare-remove"
+                      aria-label={`Remove ${titleCase(name)}`}
+                      onClick={() =>
+                        setSelection((current) => current.filter((item) => item !== name))
+                      }
+                    >
+                      <X size={18} aria-hidden="true" />
+                    </button>
+                    {pokemon ? (
+                      <Link to={`/pokemon/${pokemon.name}`}>
+                        <PokemonSprite id={pokemon.id} />
+                        <strong>{titleCase(pokemon.name)}</strong>
+                      </Link>
+                    ) : details[index]?.isError ? (
+                      <button
+                        type="button"
+                        className="text-button"
+                        onClick={() => void details[index].refetch()}
+                      >
+                        {titleCase(name)} could not load. Try again
+                      </button>
+                    ) : (
+                      <>
+                        <span className="sprite skeleton" aria-hidden="true" />
+                        <strong>{titleCase(name)}</strong>
+                      </>
+                    )}
+                  </div>
+                )
+              })}
+            </div>
+            <CompareRow label="Types" columns={columns}>
+              {details.map((query, index) => (
+                <div className="type-row" key={selection[index]}>
+                  {query.data?.types.map(({ type }) => (
+                    <TypeBadge key={type.name} type={type.name} link />
                   ))}
-                </tr>
-              </thead>
-              <tbody>
-                <tr>
-                  <th scope="row">Types</th>
-                  {selection.map((name, index) => (
-                    <td key={name}>
-                      {details[index]?.data
-                        ? details[index].data.types.map(({ type }) => (
-                            <Link
-                              key={type.name}
-                              to={`/types/${type.name}`}
-                              style={
-                                {
-                                  '--type-color': TYPE_COLORS[type.name] ?? '#9299a2',
-                                } as React.CSSProperties
-                              }
-                            >
-                              {titleCase(type.name)}
-                            </Link>
-                          ))
-                        : 'Loading…'}
-                    </td>
+                </div>
+              ))}
+            </CompareRow>
+            <CompareRow label="Abilities" columns={columns}>
+              {details.map((query, index) => (
+                <div className="compare-abilities" key={selection[index]}>
+                  {query.data?.abilities.map(({ ability, is_hidden }) => (
+                    <Link key={ability.name} to={`/abilities/${ability.name}`}>
+                      {titleCase(ability.name)}
+                      {is_hidden && <small> (hidden)</small>}
+                    </Link>
                   ))}
-                </tr>
-                <tr>
-                  <th scope="row">Abilities</th>
-                  {selection.map((name, index) => (
-                    <td key={name}>
-                      {details[index]?.data
-                        ? details[index].data.abilities.map(({ ability, is_hidden }) => (
-                            <Link
-                              className="compare-ability"
-                              key={ability.name}
-                              to={`/abilities/${ability.name}`}
-                            >
-                              {titleCase(ability.name)}
-                              {is_hidden && <small>Hidden</small>}
-                            </Link>
-                          ))
-                        : 'Loading…'}
-                    </td>
-                  ))}
-                </tr>
-                {statNames.map((statName) => (
-                  <tr key={statName}>
-                    <th scope="row">{titleCase(statName)}</th>
-                    {selection.map((name, index) => {
-                      const stat = details[index]?.data?.stats.find(
-                        (entry) => entry.stat.name === statName,
-                      )
-                      return (
-                        <td key={name}>
-                          {stat?.base_stat ??
-                            (details[index]?.isError ? 'Unavailable' : 'Loading…')}
-                        </td>
-                      )
-                    })}
-                  </tr>
-                ))}
-                <tr className="compare-total-row">
-                  <th scope="row">Base stat total</th>
-                  {selection.map((name, index) => (
-                    <td key={name}>
-                      {details[index]?.data?.stats.reduce((sum, stat) => sum + stat.base_stat, 0) ??
-                        '—'}
-                    </td>
-                  ))}
-                </tr>
-              </tbody>
-            </table>
+                </div>
+              ))}
+            </CompareRow>
+            {statNames.map((statName) => (
+              <StatRow
+                key={statName}
+                label={statLabel(statName)}
+                columns={columns}
+                values={details.map(
+                  (query) =>
+                    query.data?.stats.find((entry) => entry.stat.name === statName)?.base_stat,
+                )}
+                ids={selection}
+              />
+            ))}
+            {loaded.length > 0 && (
+              <StatRow
+                label="Total"
+                columns={columns}
+                values={details.map((query) => statTotal(query.data))}
+                ids={selection}
+                scale={780}
+              />
+            )}
           </div>
         )}
-      </section>
+        <p className="note">
+          Base stats are species data. They don’t include level, nature, training or battle effects.
+        </p>
+      </div>
     </main>
+  )
+}
+
+function statTotal(pokemon?: Pokemon) {
+  return pokemon?.stats.reduce((sum, stat) => sum + stat.base_stat, 0)
+}
+
+function CompareRow({
+  label,
+  columns,
+  children,
+}: {
+  label: string
+  columns: React.CSSProperties
+  children: React.ReactNode
+}) {
+  return (
+    <div className="compare-row">
+      <h3>{label}</h3>
+      <div className="compare-grid" style={columns}>
+        {children}
+      </div>
+    </div>
+  )
+}
+
+function StatRow({
+  label,
+  values,
+  columns,
+  ids,
+  scale = 255,
+}: {
+  label: string
+  values: (number | undefined)[]
+  columns: React.CSSProperties
+  ids: string[]
+  scale?: number
+}) {
+  const known = values.filter((value): value is number => value != null)
+  const best = known.length > 1 ? Math.max(...known) : null
+  return (
+    <CompareRow label={label} columns={columns}>
+      {values.map((value, index) => (
+        <div className="compare-stat" key={ids[index]} data-best={value === best || undefined}>
+          <b>{value ?? '—'}</b>
+          <div className="stat-track" aria-hidden="true">
+            <i style={{ transform: `scaleX(${Math.min((value ?? 0) / scale, 1)})` }} />
+          </div>
+        </div>
+      ))}
+    </CompareRow>
   )
 }

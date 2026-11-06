@@ -1,258 +1,375 @@
-import { useEffect, useMemo } from 'react'
-import { Link, useParams } from 'react-router-dom'
-import { ActionLink, Button } from '../components/ui'
-import { SavePokemonButton } from '../features/collection/SavePokemonButton'
+import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import { useQuery } from '@tanstack/react-query'
-import { EncounterBrowser, EvolutionSection, FormsSection, LearnsetBrowser, SpeciesFacts } from './PokemonContextSections'
+import { ArrowLeftRight, ChevronLeft, ChevronRight, Shuffle } from 'lucide-react'
+import { Link, useParams, useSearchParams } from 'react-router-dom'
+import { TopBar } from '../components/common/TopBar'
+import { ErrorState, HaloArt, LoadingState, TypeBadge } from '../components/ui'
+import { SavePokemonButton } from '../features/collection/SavePokemonButton'
+import { rememberRecentPokemon } from '../features/pokedex/recentPokemon'
+import { MatchupList } from './MatchupList'
 import {
-  getEnglishFlavorEntry,
-  getEnglishFlavorText,
+  friendlyError,
+  getPokedexFacts,
   getPokemon,
-  getPokemonPage,
   getPokemonSpecies,
+  getPokemonSpeciesCount,
   paddedId,
+  randomFactIndex,
   pokemonArtwork,
   pokemonKeys,
   pokemonSprite,
-  PokeApiError,
+  statLabel,
   titleCase,
-  TYPE_COLORS,
+  typeVars,
+  type Pokemon,
+  type PokemonSpecies,
 } from '../lib/pokeapi/client'
+import { usePageTitle } from '../lib/usePageTitle'
+import {
+  AbilitiesSection,
+  EncounterSection,
+  EvolutionSection,
+  FormsSection,
+  HeldItemsSection,
+  LearnsetSection,
+} from './PokemonSections'
+
+const TABS = [
+  { id: 'about', label: 'About' },
+  { id: 'stats', label: 'Stats' },
+  { id: 'moves', label: 'Moves' },
+  { id: 'where', label: 'Where' },
+] as const
+type TabId = (typeof TABS)[number]['id']
+
+/** Tints the status bar to match the hero on platforms that honor theme-color. */
+function useThemeColorFrom(element: React.RefObject<HTMLElement | null>, active: boolean) {
+  useEffect(() => {
+    if (!active || !element.current) return
+    const metas = [...document.querySelectorAll<HTMLMetaElement>('meta[name="theme-color"]')]
+    const originals = metas.map((meta) => meta.content)
+    const color = getComputedStyle(element.current).backgroundColor
+    metas.forEach((meta) => {
+      meta.content = color
+    })
+    return () => {
+      metas.forEach((meta, index) => {
+        meta.content = originals[index]
+      })
+    }
+  }, [element, active])
+}
+
+/** True until the sheet has slid up past the Pokémon's name. The pinned hero itself never moves. */
+function useIsAboveLine(element: React.RefObject<HTMLElement | null>, active: boolean) {
+  const [visible, setVisible] = useState(true)
+  useEffect(() => {
+    if (!active || !element.current) return
+    const observer = new IntersectionObserver(
+      ([entry]) => setVisible(entry.boundingClientRect.top > (entry.rootBounds?.top ?? 0)),
+      { rootMargin: '-112px 0px 0px' },
+    )
+    observer.observe(element.current)
+    return () => observer.disconnect()
+  }, [element, active])
+  return visible
+}
 
 export function PokemonDetailPage() {
   const { name = '' } = useParams()
+  const [searchParams, setSearchParams] = useSearchParams()
+  const requestedTab = searchParams.get('tab')
+  const tab: TabId = TABS.some((item) => item.id === requestedTab)
+    ? (requestedTab as TabId)
+    : 'about'
+  const hero = useRef<HTMLElement>(null)
+  const sheetEdge = useRef<HTMLDivElement>(null)
+
   const pokemon = useQuery({
     queryKey: pokemonKeys.detail(name),
     queryFn: ({ signal }) => getPokemon(name, signal),
     enabled: Boolean(name),
     staleTime: 1000 * 60 * 60 * 12,
   })
+  const data = pokemon.data
+  // Forms such as charizard-mega-x have no species record of their own.
+  const speciesName = data?.species?.name
   const species = useQuery({
-    queryKey: pokemonKeys.species(name),
-    queryFn: ({ signal }) => getPokemonSpecies(name, signal),
-    enabled: Boolean(name),
+    queryKey: pokemonKeys.species(speciesName ?? ''),
+    queryFn: ({ signal }) => getPokemonSpecies(speciesName!, signal),
+    enabled: Boolean(speciesName),
     staleTime: 1000 * 60 * 60 * 24,
   })
-  const data = pokemon.data
-  const pokemonIndex = useQuery({
-    queryKey: pokemonKeys.count,
-    queryFn: ({ signal }) => getPokemonPage(0, 1, signal),
+  const speciesCount = useQuery({
+    queryKey: pokemonKeys.speciesCount,
+    queryFn: ({ signal }) => getPokemonSpeciesCount(signal),
     enabled: Boolean(data),
     staleTime: 1000 * 60 * 60 * 24,
   })
-  const description = useMemo(() => getEnglishFlavorText(species.data), [species.data])
-  const descriptionEntry = useMemo(() => getEnglishFlavorEntry(species.data), [species.data])
-  const mainType = data?.types[0]?.type.name ?? ''
 
+  const headingVisible = useIsAboveLine(sheetEdge, Boolean(data))
+  useThemeColorFrom(hero, Boolean(data))
+  usePageTitle(data ? titleCase(data.name) : 'Pokémon')
   useEffect(() => {
-    document.title = data ? `${titleCase(data.name)} | Pokédex` : 'Pokémon | Pokédex'
-    return () => {
-      document.title = 'Pokédex — Discover Pokémon'
-    }
+    if (data) rememberRecentPokemon(data)
   }, [data])
 
   if (pokemon.isLoading)
     return (
-      <main className="detail-page detail-page-loading">
-        <div className="detail-loading">
-          <span className="loader" />
-          Loading Pokémon…
-        </div>
+      <main className="page">
+        <TopBar title="" back="/pokedex" />
+        <LoadingState label="Loading Pokémon" />
       </main>
     )
-  if (pokemon.isError || !data) {
-    const isMissing = pokemon.error instanceof PokeApiError && pokemon.error.status === 404
+  if (!data)
     return (
-      <main className="detail-page">
-        <div className="not-found page-width">
-          <h2>{isMissing ? 'Pokémon not found' : 'Could not load Pokémon'}</h2>
-          <p>
-            {pokemon.error instanceof Error
-              ? pokemon.error.message
-              : 'This Pokémon could not be loaded.'}
-          </p>
-          <Button onClick={() => void pokemon.refetch()}>Try again</Button>
-          <ActionLink to="/pokedex">Back to Pokédex</ActionLink>
-        </div>
+      <main className="page">
+        <TopBar title="Pokémon" back="/pokedex" />
+        <ErrorState
+          message={friendlyError(pokemon.error, 'This Pokémon')}
+          onRetry={() => void pokemon.refetch()}
+        />
       </main>
     )
-  }
+
+  const label = titleCase(data.name)
+  // Alternate forms use ids above 10000 and sit outside the numbered Pokédex.
+  const isNumbered = data.id <= (speciesCount.data ?? 1025)
+  const search = tab === 'about' ? '' : `?tab=${tab}`
+  const genus = species.data?.genera?.find((entry) => entry.language.name === 'en')?.genus
 
   return (
-    <main
-      className="detail-page"
-      style={{ '--pokemon-color': TYPE_COLORS[mainType] || '#7ac850' } as React.CSSProperties}
-    >
-      <div className="detail-top page-width">
-        <div className="crumb crumb-light">
-          <Link to="/">Home</Link>
-          <span>/</span>
-          <Link to="/pokedex">Pokédex</Link>
-          <span>/</span>
-          <b>{titleCase(data.name)}</b>
+    <main className="page detail" style={typeVars(data.types[0]?.type.name)}>
+      <TopBar
+        className="hero-plate"
+        title={label}
+        titleAs="div"
+        titleHidden={headingVisible}
+        back="/pokedex"
+      />
+      <section className="detail-hero hero-plate" ref={hero}>
+        <div className="detail-identity">
+          <div className="detail-names">
+            <h1>
+              {label}
+              <span className="title-dot" aria-hidden="true">
+                .
+              </span>
+            </h1>
+            {genus && <p>{genus}</p>}
+          </div>
+          <span className="detail-number">{paddedId(data.id)}</span>
+        </div>
+        <div className="detail-actions">
+          <div className="type-row">
+            {data.types.map(({ type }) => (
+              <TypeBadge key={type.name} type={type.name} link />
+            ))}
+          </div>
           <SavePokemonButton name={data.name} />
         </div>
-        <div className="detail-title">
-          <div>
-            <span className="detail-kicker">
-              NO. {String(data.id).padStart(3, '0')} ·{' '}
-              {data.types
-                .map((type) => type.type.name)
-                .join(' / ')
-                .toUpperCase()}
-            </span>
-            <h1>
-              {titleCase(data.name)}
-              <span>.</span>
-            </h1>
-            <div className="detail-types">
-              {data.types.map((type) => (
-                <Link className="detail-type" key={type.type.name} to={`/types/${type.type.name}`}>
-                  {type.type.name}
-                </Link>
-              ))}
-            </div>
-          </div>
-          <strong className="detail-number">{paddedId(data.id)}</strong>
-        </div>
-        <div className="detail-image-wrap">
-          <div className="detail-image-ring" />
-          <span className="detail-image-star star-left" aria-hidden="true">
-            ✦
-          </span>
-          <span className="detail-image-star star-right" aria-hidden="true">
-            ✧
-          </span>
-          <img
-            src={pokemonArtwork(data)}
-            onError={(event) => {
-              const image = event.currentTarget
-              const fallback = pokemonSprite(data.id)
-              if (image.src !== fallback) image.src = fallback
-              else image.hidden = true
-            }}
-            alt={`${titleCase(data.name)} official artwork`}
-          />
-        </div>
-        <div className="detail-footnote">
-          <span>SPECIES PROFILE</span>
-          <span>{paddedId(data.id)}</span>
-        </div>
-      </div>
-      <section className="detail-content">
-        <div className="detail-content-inner">
-          <div className="fact-block">
-            <span className="content-label">A LITTLE ABOUT {data.name.toUpperCase()}</span>
-            <h2>Did you know?</h2>
-            {species.isLoading ? (
-              <p className="muted">Loading description…</p>
-            ) : species.isError ? (
-              <div className="description-error"><p className="muted">Species information is unavailable right now.</p><Button onClick={() => void species.refetch()}>Retry</Button></div>
-            ) : (
-              <p>{description}</p>
-            )}
-          </div>
-          {species.data && <>
-            <SpeciesFacts species={species.data} descriptionVersion={descriptionEntry?.version_group?.name} />
-            <FormsSection species={species.data} currentName={data.name} />
-            <EvolutionSection species={species.data} />
-          </>}
-          <div className="detail-columns">
-            <section className="stats-section" aria-labelledby="stats-title">
-              <div className="content-heading">
-                <div>
-                  <span className="content-label">THE NUMBERS</span>
-                  <h2 id="stats-title">Base stats</h2>
-                </div>
-                <span className="stat-total">
-                  TOTAL <b>{data.stats.reduce((sum, stat) => sum + stat.base_stat, 0)}</b>
-                </span>
-              </div>
-              {data.stats.map((stat) => (
-                <div className="stat-row" key={stat.stat.name}>
-                  <span>{stat.stat.name.replace('-', ' ')}</span>
-                  <b>{stat.base_stat}</b>
-                  <div
-                    className="stat-track"
-                    role="progressbar"
-                    aria-label={stat.stat.name.replace('-', ' ')}
-                    aria-valuemin={0}
-                    aria-valuemax={255}
-                    aria-valuenow={stat.base_stat}
-                  >
-                    <i style={{ width: `${Math.min((stat.base_stat / 255) * 100, 100)}%` }} />
-                  </div>
-                </div>
-              ))}
-            </section>
-            <section className="profile-section">
-              <span className="content-label">GET TO KNOW IT</span>
-              <h2>Profile</h2>
-              <div className="profile-grid">
-                <div className="profile-item">
-                  <span>HEIGHT</span>
-                  <b>
-                    {(data.height / 10).toFixed(1)} <small>m</small>
-                  </b>
-                </div>
-                <div className="profile-item">
-                  <span>WEIGHT</span>
-                  <b>
-                    {(data.weight / 10).toFixed(1)} <small>kg</small>
-                  </b>
-                </div>
-                <div className="profile-item">
-                  <span>BASE XP</span>
-                  <b>{data.base_experience ?? '—'}</b>
-                </div>
-              </div>
-              <div className="ability-heading">Abilities</div>
-              <div className="ability-list">
-                {data.abilities.map((ability) => (
-                  <Link to={`/abilities/${ability.ability.name}`} key={ability.ability.name}>
-                    {titleCase(ability.ability.name)}
-                    {ability.is_hidden && <small>HIDDEN</small>}
-                  </Link>
-                ))}
-              </div>
-            </section>
-          </div>
-          <LearnsetBrowser moves={data.moves ?? []} />
-          <EncounterBrowser pokemonId={data.id} pokemonName={data.name} endpointAvailable={Boolean(data.location_area_encounters)} />
-          <section className="pokemon-reference-section" aria-labelledby="pokemon-items-title">
-            <span className="content-label">ITEM REFERENCE</span>
-            <h2 id="pokemon-items-title">Held items</h2>
-            {data.held_items?.length ? (
-              <ul className="pokemon-held-item-list">
-                {data.held_items.map(({ item, version_details: versions }) => (
-                  <li key={item.name}>
-                    <Link to={`/items/${item.name}`}>{titleCase(item.name)}</Link>
-                    <span>
-                      {versions.length
-                        ? versions
-                            .map(
-                              (version) =>
-                                `${titleCase(version.version.name)} · ${version.rarity}%`,
-                            )
-                            .join(' / ')
-                        : 'Version details unavailable'}
-                    </span>
-                  </li>
-                ))}
-              </ul>
-            ) : (
-              <p className="muted">No held items are listed in this Pokémon record.</p>
-            )}
-          </section>
-          <nav className="detail-navigation" aria-label="Pokémon navigation">
-            {data.id > 1 ? <Link to={`/pokemon/${data.id - 1}`}>← Previous Pokémon</Link> : <span className="detail-navigation-disabled" aria-disabled="true">First Pokémon</span>}
-            <Link to="/pokedex">
-              Back to Pokédex <span>↗</span>
+        <div className="detail-stage">
+          {isNumbered && data.id > 1 ? (
+            <Link
+              className="icon-button detail-step"
+              to={`/pokemon/${data.id - 1}${search}`}
+              replace
+              aria-label="Previous Pokémon"
+            >
+              <ChevronLeft size={24} aria-hidden="true" />
             </Link>
-            {pokemonIndex.data && data.id >= pokemonIndex.data.count ? <span className="detail-navigation-disabled" aria-disabled="true">Last Pokémon</span> : <Link to={`/pokemon/${data.id + 1}`}>Next Pokémon →</Link>}
-          </nav>
+          ) : (
+            <span className="detail-step-spacer" />
+          )}
+          <HaloArt
+            className="detail-art"
+            src={pokemonArtwork(data)}
+            fallbackSrc={pokemonSprite(data.id)}
+            alt={`${label} official artwork`}
+          />
+          {isNumbered && data.id < (speciesCount.data ?? 1025) ? (
+            <Link
+              className="icon-button detail-step"
+              to={`/pokemon/${data.id + 1}${search}`}
+              replace
+              aria-label="Next Pokémon"
+            >
+              <ChevronRight size={24} aria-hidden="true" />
+            </Link>
+          ) : (
+            <span className="detail-step-spacer" />
+          )}
         </div>
       </section>
+
+      <div ref={sheetEdge} aria-hidden="true" />
+      <div className="detail-sheet">
+        <div className="segmented-wrap">
+          <div className="segmented" role="tablist" aria-label={`${label} details`}>
+            {TABS.map((item) => (
+              <button
+                key={item.id}
+                type="button"
+                role="tab"
+                id={`tab-${item.id}`}
+                aria-selected={tab === item.id}
+                aria-controls="detail-panel"
+                onClick={() =>
+                  setSearchParams(item.id === 'about' ? {} : { tab: item.id }, {
+                    replace: true,
+                    preventScrollReset: true,
+                  })
+                }
+              >
+                {item.label}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        <div
+          className="page-body detail-panel"
+          role="tabpanel"
+          id="detail-panel"
+          aria-labelledby={`tab-${tab}`}
+        >
+          {tab === 'about' && (
+            <AboutTab
+              data={data}
+              species={species.data}
+              speciesFailed={species.isError}
+              factKey={`${speciesName}-${species.dataUpdatedAt}`}
+              onRetry={() => void species.refetch()}
+            />
+          )}
+          {tab === 'stats' && <StatsTab data={data} />}
+          {tab === 'moves' && <LearnsetSection moves={data.moves ?? []} />}
+          {tab === 'where' && (
+            <>
+              <EncounterSection pokemonId={data.id} label={label} />
+              <HeldItemsSection items={data.held_items ?? []} />
+            </>
+          )}
+        </div>
+      </div>
     </main>
+  )
+}
+
+function Fact({ label, children }: { label: string; children: ReactNode }) {
+  return (
+    <div className="fact">
+      <dt>{label}</dt>
+      <dd>{children}</dd>
+    </div>
+  )
+}
+
+/** A random Pokédex entry each time the page opens or the data refetches. */
+function FactCard({ species }: { species: PokemonSpecies }) {
+  const facts = useMemo(() => getPokedexFacts(species), [species])
+  const [index, setIndex] = useState(() => randomFactIndex(facts.length))
+  const fact = facts[index]
+  if (!fact) return null
+  return (
+    <div className="card fact-card">
+      <p aria-live="polite">{fact.text}</p>
+      <div className="fact-card-footer">
+        <span>{fact.game ? `Pokémon ${titleCase(fact.game)}` : ''}</span>
+        {facts.length > 1 && (
+          <button
+            type="button"
+            onClick={() => setIndex((value) => randomFactIndex(facts.length, value))}
+          >
+            <Shuffle size={16} aria-hidden="true" />
+            Another fact
+          </button>
+        )}
+      </div>
+    </div>
+  )
+}
+
+function AboutTab({
+  data,
+  species,
+  speciesFailed,
+  factKey,
+  onRetry,
+}: {
+  data: Pokemon
+  species?: PokemonSpecies
+  speciesFailed: boolean
+  factKey: string
+  onRetry: () => void
+}) {
+  const status = species?.is_legendary
+    ? 'Legendary'
+    : species?.is_mythical
+      ? 'Mythical'
+      : species?.is_baby
+        ? 'Baby'
+        : null
+  return (
+    <>
+      {species && <FactCard key={factKey} species={species} />}
+      {speciesFailed && <ErrorState message="Species details could not load." onRetry={onRetry} />}
+      <dl className="facts">
+        <Fact label="Height">{(data.height / 10).toFixed(1)} m</Fact>
+        <Fact label="Weight">{(data.weight / 10).toFixed(1)} kg</Fact>
+        {species?.generation && (
+          <Fact label="Generation">
+            {species.generation.name.replace('generation-', '').toUpperCase()}
+          </Fact>
+        )}
+        {species?.habitat && <Fact label="Habitat">{titleCase(species.habitat.name)}</Fact>}
+        {data.base_experience != null && <Fact label="Base XP">{data.base_experience}</Fact>}
+        {status && <Fact label="Status">{status}</Fact>}
+      </dl>
+      <AbilitiesSection abilities={data.abilities} />
+      {species && <EvolutionSection species={species} />}
+      {species && <FormsSection species={species} currentName={data.name} />}
+    </>
+  )
+}
+
+function StatsTab({ data }: { data: Pokemon }) {
+  const total = data.stats.reduce((sum, stat) => sum + stat.base_stat, 0)
+  return (
+    <>
+      <section className="section" aria-labelledby="stats-heading">
+        <h2 className="section-title" id="stats-heading">
+          Base stats
+        </h2>
+        <div className="card stat-list">
+          {data.stats.map((stat) => (
+            <div className="stat-row" key={stat.stat.name}>
+              <span>{statLabel(stat.stat.name)}</span>
+              <b>{stat.base_stat}</b>
+              <div className="stat-track" aria-hidden="true">
+                <i style={{ transform: `scaleX(${Math.min(stat.base_stat / 255, 1)})` }} />
+              </div>
+            </div>
+          ))}
+          <div className="stat-row stat-row-total">
+            <span>Total</span>
+            <b>{total}</b>
+          </div>
+        </div>
+        <Link
+          className="button button-secondary button-block"
+          to={`/tools/compare?add=${data.name}`}
+        >
+          <ArrowLeftRight size={18} aria-hidden="true" />
+          Compare with others
+        </Link>
+      </section>
+      <section className="section" aria-labelledby="matchups-heading">
+        <h2 className="section-title" id="matchups-heading">
+          Type matchups
+        </h2>
+        <MatchupList types={data.types.map(({ type }) => type.name)} />
+      </section>
+    </>
   )
 }

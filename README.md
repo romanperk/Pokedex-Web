@@ -1,6 +1,6 @@
 # Pokédex Web
 
-A responsive, installable Pokédex and Pokémon reference app built with React and TypeScript. Browse Pokémon, follow linked reference data, compare base stats, check type effectiveness, and keep a personal collection in your browser.
+A phone-first Pokédex and Pokémon reference app built with React and TypeScript, meant to be added to your home screen. Browse Pokémon, follow linked reference data, compare base stats, check type effectiveness, and keep a personal collection on your device.
 
 ## Getting started
 
@@ -15,28 +15,29 @@ Vite prints the local development URL when the server starts. The app uses Poké
 
 ## Features
 
-- **Discover:** entry point for the Pokédex, tools, collection, and implemented reference catalogs.
-- **Pokédex:** browse and filter Pokémon, then open detailed species pages with forms, evolution, learnsets, and game-version encounter records where PokéAPI provides them.
-- **Global search:** search Pokémon, moves, abilities, items, and types. Press **Ctrl+K** (or **Command+K** on macOS) to open search.
-- **Reference library:** browse moves, abilities, items, and types, with links between related records.
-- **Tools:** inspect type effectiveness against one or two defending types and compare up to three Pokémon using base stats, types, and abilities.
-- **My Pokémon:** keep an owned-Pokémon inventory, search and sort it, and export or import a JSON backup.
-- **PWA support:** install where the browser provides an install prompt. The service worker caches app assets and a limited set of API responses and artwork.
+- **Discover:** search, a Pokémon of the day, recently viewed Pokémon, and links to the reference catalogs and tools.
+- **Pokédex:** an endless list with search and type filters. Each Pokémon opens to About, Stats, Moves and Where tabs covering a random Pokédex entry, forms, evolution, type matchups, learnsets and encounters where PokéAPI provides them.
+- **Global search:** live results across Pokémon, moves, abilities, items, and types. Press **Ctrl+K** (or **Command+K** on macOS) to open search.
+- **Reference library:** filter and browse moves, abilities, items, and types, with links between related records.
+- **Tools:** inspect type effectiveness against one or two defending types, compare up to three Pokémon using base stats, types, and abilities, guess a Pokémon from its shadow, or jump to a random one.
+- **Trainer:** choose system, light, or dark appearance, and keep an owned-Pokémon inventory. Search and sort it, undo removals, and export or import a JSON backup. Phones export through the share sheet, because home screen apps on iOS ignore download links.
+- **PWA support:** on iPhone use Share, then Add to Home Screen; on Android and desktop Chrome use the install prompt. The service worker caches the app, recent API responses, artwork, and up to 2,000 sprites.
 
 ## Routes
 
-| Route                                                              | Page                     |
-| ------------------------------------------------------------------ | ------------------------ |
-| `/`                                                                | Discover                 |
-| `/pokedex`                                                         | Pokémon list and filters |
-| `/pokemon/:name`                                                   | Pokémon details          |
-| `/search?q=...`                                                    | Global search            |
-| `/moves`, `/abilities`, `/items`, `/types`                         | Reference catalogs       |
-| `/moves/:name`, `/abilities/:name`, `/items/:name`, `/types/:name` | Reference details        |
-| `/tools`                                                           | Tools directory          |
-| `/tools/type-effectiveness`                                        | Type effectiveness       |
-| `/tools/compare`                                                   | Pokémon comparison       |
-| `/my-pokemon`                                                      | Local collection         |
+| Route                                                              | Page                           |
+| ------------------------------------------------------------------ | ------------------------------ |
+| `/`                                                                | Discover                       |
+| `/pokedex`                                                         | Pokémon list and filters       |
+| `/pokemon/:name`                                                   | Pokémon details                |
+| `/search?q=...`                                                    | Global search                  |
+| `/moves`, `/abilities`, `/items`, `/types`                         | Reference catalogs             |
+| `/moves/:name`, `/abilities/:name`, `/items/:name`, `/types/:name` | Reference details              |
+| `/tools`                                                           | Tools directory                |
+| `/tools/type-effectiveness`                                        | Type effectiveness             |
+| `/tools/compare`                                                   | Pokémon comparison             |
+| `/tools/guess`                                                     | Guess the Pokémon              |
+| `/trainer`                                                         | Collection, appearance, backup |
 
 ## Local collection and data scope
 

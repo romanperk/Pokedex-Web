@@ -1,0 +1,285 @@
+/* Type effectiveness */
+.type-picker {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
+}
+.type-picker .chip {
+  min-height: 44px;
+  justify-content: flex-start;
+  border-radius: var(--radius-control);
+}
+.type-picker + .note,
+.section > .card + .note {
+  margin-top: 0;
+}
+
+/* Compare */
+.compare-picker {
+  display: grid;
+  gap: 8px;
+}
+.compare-table {
+  margin-top: 16px;
+  overflow: hidden;
+  border-radius: var(--radius-card);
+  background: var(--surface);
+}
+.compare-grid {
+  display: grid;
+  grid-template-columns: repeat(var(--columns), minmax(0, 1fr));
+  gap: 12px;
+}
+.compare-header {
+  padding: 8px 12px 12px;
+}
+.compare-pokemon {
+  position: relative;
+  display: grid;
+  justify-items: center;
+  align-content: start;
+  gap: 2px;
+  min-width: 0;
+  text-align: center;
+}
+.compare-pokemon > a {
+  display: grid;
+  justify-items: center;
+  max-width: 100%;
+}
+.compare-pokemon .sprite {
+  width: 80px;
+  height: 80px;
+}
+.compare-pokemon strong {
+  font-size: 14px;
+  font-weight: 500;
+  line-height: 20px;
+  overflow-wrap: anywhere;
+}
+.compare-remove {
+  position: absolute;
+  z-index: 1;
+  top: -4px;
+  right: -8px;
+  color: var(--text-3);
+}
+.compare-row {
+  display: grid;
+  gap: 4px;
+  padding: 8px 12px 12px;
+  border-top: 1px solid var(--line);
+}
+.compare-row h3 {
+  color: var(--text-3);
+  font-size: 13px;
+  font-weight: 400;
+  line-height: 20px;
+}
+.compare-abilities {
+  display: grid;
+  align-content: start;
+  min-width: 0;
+  font-size: 14px;
+  line-height: 20px;
+  overflow-wrap: anywhere;
+}
+.compare-abilities a {
+  display: block;
+  padding-block: 8px;
+}
+.compare-abilities small {
+  color: var(--text-3);
+  font-size: 12px;
+}
+.compare-stat {
+  display: grid;
+  gap: 4px;
+  min-width: 0;
+}
+.compare-stat b {
+  font-family: var(--font-mono);
+  font-size: 15px;
+  font-weight: 400;
+  font-variant-numeric: tabular-nums;
+  line-height: 20px;
+}
+.compare-stat[data-best] b {
+  color: var(--accent);
+  font-weight: 600;
+}
+.compare-stat[data-best] .stat-track i {
+  background: var(--accent);
+}
+.compare .note {
+  margin-top: 12px;
+}
+
+/* Tools directory */
+.tools-page {
+  display: grid;
+  gap: 8px;
+}
+.tool-card {
+  position: relative;
+  display: grid;
+  gap: 8px;
+  padding: 16px;
+  overflow: hidden;
+  border-radius: 20px;
+  transition: transform 150ms var(--ease);
+}
+.tool-card:active {
+  transform: scale(0.99);
+}
+.tool-card-label {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-size: 13px;
+  line-height: 20px;
+}
+.tool-card-title {
+  font-size: 28px;
+  font-weight: 700;
+  line-height: 32px;
+  letter-spacing: -0.02em;
+  overflow-wrap: anywhere;
+}
+.tool-card-weak {
+  display: grid;
+  gap: 4px;
+  margin-top: 4px;
+  font-size: 13px;
+  line-height: 20px;
+}
+.tool-card-slots {
+  display: flex;
+  gap: 8px;
+  margin-top: 4px;
+}
+.tool-slot {
+  display: grid;
+  width: 72px;
+  height: 72px;
+  place-items: center;
+  border-radius: 50%;
+  background: rgb(255 255 255 / 0.34);
+}
+.tool-slot .pokemon-image {
+  width: 72px;
+  height: 72px;
+}
+button.browse-tile {
+  width: 100%;
+  border: 0;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+}
+
+.tool-card-note {
+  font-size: 13px;
+  line-height: 20px;
+}
+.tool-card-guess {
+  padding-right: 112px;
+}
+.tool-card-guess .tool-card-label {
+  margin-right: -96px;
+}
+.tool-card-teaser {
+  position: absolute;
+  right: 4px;
+  bottom: -4px;
+  width: 112px;
+  height: 112px;
+}
+.tool-card-teaser::before {
+  content: '';
+  position: absolute;
+  inset: 16px;
+  border-radius: 50%;
+  background: rgb(255 255 255 / 0.34);
+}
+.tool-card-teaser .pokemon-image {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  filter: brightness(0);
+}
+
+/* Guess the Pokémon */
+.guess-stage {
+  display: grid;
+  justify-items: center;
+  padding: 12px 16px 16px;
+  border-radius: 20px;
+}
+.guess-score {
+  display: flex;
+  width: 100%;
+  justify-content: space-between;
+  font-family: var(--font-mono);
+  font-size: 13px;
+  font-variant-numeric: tabular-nums;
+  line-height: 20px;
+}
+.guess-stage .halo-art {
+  width: min(100%, 240px);
+}
+.guess-stage .pokemon-image {
+  transition: filter 300ms var(--ease);
+}
+.guess-hidden .pokemon-image {
+  filter: brightness(0);
+}
+.guess-result {
+  min-height: 28px;
+  margin-top: 4px;
+  font-size: 20px;
+  font-weight: 600;
+  line-height: 28px;
+  text-align: center;
+}
+.guess-result a {
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+.guess-options {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+  margin-top: 8px;
+}
+.guess-option {
+  display: flex;
+  min-height: 52px;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 8px;
+  border: 0;
+  border-radius: var(--radius-control);
+  background: var(--surface);
+  font-size: 15px;
+  font-weight: 500;
+  line-height: 20px;
+  text-align: center;
+  overflow-wrap: anywhere;
+}
+.guess-option:disabled {
+  cursor: default;
+  opacity: 1;
+}
+.guess-option[data-state='correct'] {
+  background: #1f8a4c;
+  color: #fff;
+}
+.guess-option[data-state='wrong'] {
+  background: #c8281f;
+  color: #fff;
+}
+.guess-next {
+  margin-top: 12px;
+}

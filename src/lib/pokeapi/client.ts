@@ -1,3 +1,5 @@
+import type { CSSProperties } from 'react'
+
 export type NamedResource = { name: string; url: string }
 export type Pokemon = {
   id: number
@@ -32,7 +34,7 @@ export type PokemonSpecies = {
   flavor_text_entries: {
     flavor_text: string
     language: NamedResource
-    version_group?: NamedResource
+    version?: NamedResource
   }[]
   generation?: NamedResource
   habitat?: NamedResource | null
@@ -72,7 +74,6 @@ export type EvolutionLink = {
   evolves_to: EvolutionLink[]
 }
 export type EvolutionChain = { id: number; chain: EvolutionLink }
-export type PokemonVersionList = { results: NamedResource[] }
 export type PokemonEncounter = {
   location_area: NamedResource
   version_details: {
@@ -120,6 +121,7 @@ export type ResourceDetail = {
   category?: NamedResource
   cost?: number
   fling_power?: number | null
+  sprites?: { default: string | null }
   generation?: NamedResource
   type?: NamedResource
   damage_class?: NamedResource
@@ -147,6 +149,8 @@ export type ResourceDetail = {
 }
 
 const API = 'https://pokeapi.co/api/v2'
+
+export const SPECIES_COUNT = 1025
 
 export class PokeApiError extends Error {
   readonly status: number
@@ -193,8 +197,8 @@ export const getPokemonEncounters = (nameOrId: string | number, signal?: AbortSi
     signal,
   )
 
-export const getPokemonVersions = (signal?: AbortSignal) =>
-  fetchJson<PokemonVersionList>(`${API}/version?limit=1000`, signal)
+export const getPokemonSpeciesCount = async (signal?: AbortSignal) =>
+  (await fetchJson<{ count: number }>(`${API}/pokemon-species?limit=1`, signal)).count
 
 export const getPokemonType = (type: string, signal?: AbortSignal) =>
   fetchJson<PokemonTypeList>(`${API}/type/${encodeURIComponent(type)}`, signal)
@@ -248,10 +252,9 @@ export const pokemonIdFromUrl = (url: string) => {
 export const pokemonKeys = {
   lists: ['pokemon', 'list'] as const,
   directory: ['pokemon', 'directory'] as const,
-  count: ['pokemon', 'count'] as const,
   encounters: (nameOrId: string | number) =>
     ['pokemon', 'encounters', String(nameOrId).toLowerCase()] as const,
-  versions: ['pokemon', 'versions'] as const,
+  speciesCount: ['pokemon', 'species-count'] as const,
   evolution: (url: string) => ['pokemon', 'evolution', url] as const,
   list: (types: string[]) => ['pokemon', 'list', [...types].sort()] as const,
   detail: (nameOrId: string | number) =>
@@ -315,18 +318,68 @@ export const formatGeneration = (generation: string) => {
 }
 export const pokemonSprite = (id: number) =>
   `https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/${id}.png`
+export const pokemonArtworkById = (id: number) =>
+  `https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/official-artwork/${id}.png`
 export const pokemonArtwork = (pokemon: Pokemon) =>
   pokemon.sprites.other?.['official-artwork']?.front_default || pokemonSprite(pokemon.id)
 export const paddedId = (id: number) => `#${String(id).padStart(3, '0')}`
 
-export function getEnglishFlavorText(species?: PokemonSpecies) {
-  const description = getEnglishFlavorEntry(species)
-    ?.flavor_text.replace(/[\n\f]/g, ' ')
-    .replace(/\s+/g, ' ')
-    .trim()
-  return description || 'Description not available.'
+const STAT_LABELS: Record<string, string> = {
+  hp: 'HP',
+  attack: 'Attack',
+  defense: 'Defense',
+  'special-attack': 'Sp. Atk',
+  'special-defense': 'Sp. Def',
+  speed: 'Speed',
+}
+export const statLabel = (stat: string) => STAT_LABELS[stat] ?? titleCase(stat)
+
+function relativeLuminance(hex: string) {
+  const channels = [1, 3, 5].map((start) => parseInt(hex.slice(start, start + 2), 16) / 255)
+  const [red, green, blue] = channels.map((value) =>
+    value <= 0.03928 ? value / 12.92 : ((value + 0.055) / 1.055) ** 2.4,
+  )
+  return 0.2126 * red + 0.7152 * green + 0.0722 * blue
 }
 
-export function getEnglishFlavorEntry(species?: PokemonSpecies) {
-  return species?.flavor_text_entries.find((entry) => entry.language.name === 'en')
+/** Picks whichever text color reads better on a type color, so yellow chips stay legible. */
+function typeInk(hex: string) {
+  const luminance = relativeLuminance(hex)
+  return 1.05 / (luminance + 0.05) >= (luminance + 0.05) / 0.06 ? '#ffffff' : '#17181a'
+}
+
+export function typeVars(type?: string) {
+  const color = (type && TYPE_COLORS[type]) || '#9ca3ad'
+  return { '--type-color': color, '--type-ink': typeInk(color) } as CSSProperties
+}
+
+export function friendlyError(error: unknown, subject: string) {
+  if (error instanceof PokeApiError && error.status === 404) return `${subject} not found`
+  return `${subject} could not load. Check your connection and try again.`
+}
+
+export type PokedexFact = { text: string; game?: string }
+
+/** Every distinct English Pokédex entry, labeled with the first game that used the wording. */
+export function getPokedexFacts(species?: PokemonSpecies): PokedexFact[] {
+  const facts = new Map<string, PokedexFact>()
+  for (const entry of species?.flavor_text_entries ?? []) {
+    if (entry.language.name !== 'en') continue
+    const text = entry.flavor_text
+      .replace(/\u00ad\s*/g, '') // Early games hyphenate words across line breaks.
+      .replace(/[\n\f]/g, ' ')
+      .replace(/\s+/g, ' ')
+      .replace(/POK[ÉéE]MON/g, 'Pokémon')
+      .trim()
+    const key = text.toLowerCase()
+    if (text && !facts.has(key)) facts.set(key, { text, game: entry.version?.name })
+  }
+  return [...facts.values()]
+}
+
+/** A random position other than `previous`, so asking for another fact always changes it. */
+export function randomFactIndex(count: number, previous = -1) {
+  if (count < 2) return 0
+  const index = Math.floor(Math.random() * (previous < 0 ? count : count - 1))
+  return previous >= 0 && index >= previous ? index + 1 : index
 }

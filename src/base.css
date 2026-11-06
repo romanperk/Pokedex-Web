@@ -1,71 +1,200 @@
-﻿@import 'tailwindcss';
-
 :root {
+  color-scheme: light;
   font-family:
-    Inter,
-    ui-sans-serif,
     system-ui,
     -apple-system,
     BlinkMacSystemFont,
     'Segoe UI',
+    Roboto,
     sans-serif;
-  color: #202630;
-  background: #fff;
+  font-size: 16px;
   font-synthesis: none;
   text-rendering: optimizeLegibility;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
-  font-optical-sizing: auto;
-  font-weight: 400;
-  font-size: 16px;
-  --ink: #202630;
-  --muted: #7a828d;
-  --line: #e9ebee;
-  --paper: #fff;
-  --soft: #f6f7f8;
+  -webkit-text-size-adjust: 100%;
+  text-size-adjust: 100%;
+
+  --font-mono: ui-monospace, 'SF Mono', Menlo, Consolas, 'Roboto Mono', monospace;
+
+  --bg: #f4f4f5;
+  --surface: #ffffff;
+  --raised: #ececee;
+  --line: rgb(23 24 26 / 0.1);
+  --text: #17181a;
+  --text-2: #4f5157;
+  --text-3: #686a70;
+  /* Pokédex red. --accent is for text and icons, --accent-fill sits behind white. */
+  --accent: #c8281f;
+  --accent-fill: #d3302b;
+  --inverse: #17181a;
+  --on-inverse: #ffffff;
+  --warning-bg: #fdf3dc;
+  --warning-text: #6a5114;
+  --plate-mix: 34%;
+  --ring: rgb(255 255 255 / 0.45);
+  --select-chevron: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' fill='none' stroke='%234f5157' stroke-width='2' stroke-linecap='round' stroke-linejoin='round' viewBox='0 0 24 24'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E");
+  --shadow-float: 0 8px 24px rgb(0 0 0 / 0.16);
+
+  --ease: cubic-bezier(0.22, 1, 0.36, 1);
+  --radius-control: 10px;
+  --radius-card: 16px;
+
   --safe-top: env(safe-area-inset-top, 0px);
+  --safe-right: env(safe-area-inset-right, 0px);
   --safe-bottom: env(safe-area-inset-bottom, 0px);
+  --safe-left: env(safe-area-inset-left, 0px);
+  --gutter: 16px;
+  --topbar-h: 48px;
+  --tabbar-h: 56px;
 }
-* {
-  box-sizing: border-box;
+
+:root[data-theme='dark'] {
+  color-scheme: dark;
+  --bg: #101012;
+  --surface: #1b1b1e;
+  --raised: #2a2a2e;
+  --line: rgb(237 237 238 / 0.1);
+  --text: #eeeeef;
+  --text-2: #b0b0b6;
+  --text-3: #94949b;
+  --accent: #ff7a70;
+  --accent-fill: #d3302b;
+  --inverse: #eeeeef;
+  --on-inverse: #141416;
+  --warning-bg: #3a2f14;
+  --warning-text: #f0dca8;
+  --plate-mix: 32%;
+  --ring: rgb(255 255 255 / 0.08);
+  --select-chevron: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' fill='none' stroke='%23b0b0b6' stroke-width='2' stroke-linecap='round' stroke-linejoin='round' viewBox='0 0 24 24'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E");
+  --shadow-float: 0 8px 24px rgb(0 0 0 / 0.5);
 }
-html {
-  min-width: 320px;
-  min-height: 100%;
-  scroll-behavior: auto;
-}
-body {
-  margin: 0;
-  min-width: 320px;
-  min-height: 100vh;
-  background: #fff;
-}
-button,
-input {
-  font: inherit;
-}
-button {
-  color: inherit;
-}
-button:focus-visible,
-a:focus-visible,
-input:focus-visible {
-  outline: 3px solid #306de0;
-  outline-offset: 3px;
-}
-button:disabled {
-  cursor: not-allowed;
-}
-img {
-  display: block;
-  max-width: 100%;
+
+/*
+ * Reset. It sits in a layer so that every unlayered rule in the app wins over it
+ * regardless of selector specificity.
+ */
+@layer reset {
+  *,
+  ::before,
+  ::after,
+  ::backdrop,
+  ::file-selector-button {
+    box-sizing: border-box;
+    margin: 0;
+    padding: 0;
+    border: 0 solid;
+    -webkit-tap-highlight-color: transparent;
+  }
+  html {
+    min-width: 320px;
+    line-height: 1.5;
+    background: var(--bg);
+  }
+  body {
+    min-width: 320px;
+    min-height: 100dvh;
+    background: var(--bg);
+    color: var(--text);
+    line-height: 1.4;
+  }
+  h1,
+  h2,
+  h3,
+  h4 {
+    font-size: inherit;
+    font-weight: inherit;
+  }
+  b,
+  strong {
+    font-weight: bolder;
+  }
+  small {
+    font-size: 80%;
+  }
+  ul {
+    list-style: none;
+  }
+  a {
+    color: inherit;
+    text-decoration: inherit;
+  }
+  img,
+  svg {
+    display: block;
+    vertical-align: middle;
+  }
+  img {
+    max-width: 100%;
+    height: auto;
+  }
+  button,
+  input,
+  select,
+  ::file-selector-button {
+    font: inherit;
+    letter-spacing: inherit;
+    color: inherit;
+    border-radius: 0;
+    background-color: transparent;
+    opacity: 1;
+  }
+  ::placeholder {
+    opacity: 1;
+  }
+  ::-webkit-search-decoration,
+  input[type='search']::-webkit-search-cancel-button {
+    -webkit-appearance: none;
+  }
+  input[type='search']::-webkit-search-cancel-button {
+    display: none;
+  }
+  button,
+  ::file-selector-button {
+    appearance: button;
+  }
+  [hidden] {
+    display: none !important;
+  }
+  summary {
+    display: list-item;
+    list-style: none;
+  }
+  summary::-webkit-details-marker {
+    display: none;
+  }
+  a,
+  button,
+  summary,
+  label,
+  select {
+    /* Removes the double-tap zoom delay on controls; pinch zoom still works. */
+    touch-action: manipulation;
+  }
+  button,
+  summary,
+  select {
+    cursor: pointer;
+  }
+  button:disabled {
+    cursor: not-allowed;
+    opacity: 0.5;
+  }
+  :focus-visible {
+    outline: 2px solid var(--accent);
+    outline-offset: 2px;
+  }
 }
 ::selection {
-  background: #fbd8d6;
-  color: #242a33;
+  background: color-mix(in srgb, var(--accent-fill) 24%, transparent);
 }
-#root {
-  min-height: 100vh;
-  padding: var(--safe-top) env(safe-area-inset-right, 0px) var(--safe-bottom)
-    env(safe-area-inset-left, 0px);
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    scroll-behavior: auto !important;
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
 }

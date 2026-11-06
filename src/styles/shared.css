@@ -1,205 +1,691 @@
-.page-width {
-  width: min(1160px, calc(100% - 48px));
+/* Page frame */
+.page {
+  animation: page-enter 240ms var(--ease);
+}
+.page-body {
+  width: min(100%, 960px);
   margin-inline: auto;
+  padding: 8px max(var(--gutter), var(--safe-right)) 0 max(var(--gutter), var(--safe-left));
 }
-.top-search span,
-.list-search > span {
-  font-size: 22px;
-  line-height: 1;
+@keyframes page-enter {
+  from {
+    opacity: 0;
+    transform: translateY(4px);
+  }
 }
-.top-search kbd,
-.list-search kbd {
-  font:
-    11px ui-monospace,
-    monospace;
-  border: 1px solid var(--line);
-  border-radius: 4px;
-  padding: 2px 5px;
-  color: #8b929c;
-  margin-left: 10px;
+.section {
+  display: grid;
+  gap: 12px;
+  margin-top: 32px;
 }
-.eyebrow {
-  font-size: 10px;
-  letter-spacing: 1.8px;
-  font-weight: 750;
-  color: #8b929c;
+.section-first {
+  margin-top: 8px;
 }
-.primary-button {
-  display: flex;
-  width: max-content;
+.section-title {
+  font-size: 17px;
+  font-weight: 600;
+  line-height: 24px;
+}
+.count {
+  color: var(--text-3);
+  font-size: 13px;
+  font-weight: 400;
+  font-variant-numeric: tabular-nums;
+}
+.note {
+  color: var(--text-3);
+  font-size: 13px;
+  line-height: 20px;
+}
+.note-warning {
+  margin-bottom: 12px;
+  padding: 12px;
+  border-radius: var(--radius-control);
+  background: var(--warning-bg);
+  color: var(--warning-text);
+}
+.result-summary {
+  min-height: 20px;
+  margin-top: 8px;
+  color: var(--text-3);
+  font-size: 13px;
+  line-height: 20px;
+  font-variant-numeric: tabular-nums;
+}
+.visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  padding: 0;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+.scroll-sentinel {
+  height: 1px;
+}
+
+/* The dex number is the app's signature: every Pokémon carries it in mono. */
+.dex-number {
+  color: var(--text-3);
+  font-family: var(--font-mono);
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+  line-height: 16px;
+}
+
+/* Buttons */
+.button {
+  display: inline-flex;
+  min-height: 44px;
   align-items: center;
-  background: #202630;
-  color: #fff;
+  justify-content: center;
+  gap: 8px;
+  padding: 0 16px;
+  border: 0;
+  border-radius: var(--radius-control);
+  font-size: 15px;
+  font-weight: 500;
+  line-height: 20px;
+  white-space: nowrap;
+  transition:
+    background-color 150ms var(--ease),
+    transform 150ms var(--ease);
+}
+.button:active:not(:disabled) {
+  transform: scale(0.98);
+}
+.button-primary {
+  background: var(--inverse);
+  color: var(--on-inverse);
+}
+.button-secondary {
+  background: var(--surface);
+  box-shadow: inset 0 0 0 1px var(--line);
+  color: var(--text);
+}
+.button-block {
+  width: 100%;
+}
+.icon-button {
+  display: inline-flex;
+  flex: none;
+  width: 44px;
+  height: 44px;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  border: 0;
+  border-radius: 50%;
+  background: transparent;
+  color: var(--text-2);
+  transition: background-color 150ms var(--ease);
+}
+.icon-button:active {
+  background: var(--line);
+}
+.text-button {
+  padding: 4px 0;
+  border: 0;
+  background: none;
+  color: var(--accent);
+  font-size: 13px;
+  text-align: left;
+}
+@media (hover: hover) {
+  .button-secondary:hover,
+  .list a.list-row:hover,
+  .list button.list-row:hover {
+    background: color-mix(in srgb, var(--text) 4%, var(--surface));
+  }
+  .button-primary:hover {
+    background: color-mix(in srgb, var(--inverse) 88%, var(--bg));
+  }
+  .icon-button:hover {
+    background: var(--line);
+  }
+}
+
+/* Search and form fields. 16px text stops iOS zooming the page on focus. */
+.search-field {
+  display: flex;
+  min-height: 44px;
+  align-items: center;
+  gap: 8px;
+  padding-left: 12px;
+  border-radius: var(--radius-control);
+  background: var(--raised);
+  color: var(--text-3);
+}
+.search-field svg {
+  flex: none;
+}
+.search-field input {
+  min-width: 0;
+  flex: 1;
+  height: 44px;
+  border: 0;
+  outline: 0;
+  background: transparent;
+  color: var(--text);
+  font-size: 16px;
+  appearance: none;
+}
+.search-field input::placeholder {
+  color: var(--text-3);
+  opacity: 1;
+}
+.search-field:focus-within {
+  outline: 2px solid var(--accent);
+  outline-offset: -2px;
+}
+.search-clear {
+  display: inline-flex;
+  width: 44px;
+  height: 44px;
+  flex: none;
+  align-items: center;
+  justify-content: center;
+  border: 0;
+  background: transparent;
+  color: var(--text-3);
+}
+.search-field-link {
+  padding-right: 12px;
+  font-size: 16px;
+}
+.field {
+  display: grid;
+  gap: 4px;
+  color: var(--text-2);
+  font-size: 13px;
+  line-height: 20px;
+}
+.field select,
+.inline-select select {
+  width: 100%;
+  min-height: 44px;
+  padding: 0 40px 0 12px;
+  border: 0;
+  border-radius: var(--radius-control);
+  background: var(--raised) var(--select-chevron) no-repeat right 12px center;
+  color: var(--text);
+  font-size: 16px;
+  appearance: none;
+  -webkit-appearance: none;
+}
+
+/* Segmented control */
+.segmented {
+  display: grid;
+  grid-auto-flow: column;
+  grid-auto-columns: minmax(0, 1fr);
+  gap: 2px;
+  padding: 2px;
+  border-radius: 10px;
+  background: var(--raised);
+}
+.segmented button {
+  display: inline-flex;
+  min-height: 40px;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
   border: 0;
   border-radius: 8px;
-  padding: 13px 17px;
-  font-size: 13px;
-  font-weight: 650;
-  margin-top: 25px;
-  cursor: pointer;
+  background: transparent;
+  color: var(--text-2);
+  font-size: 14px;
+  font-weight: 500;
   transition:
-    transform 0.2s,
-    background 0.2s;
+    background-color 150ms var(--ease),
+    color 150ms var(--ease);
 }
-.primary-button:hover {
-  background: #343d4a;
-  transform: translateY(-1px);
+.segmented button[aria-selected='true'],
+.segmented button[aria-checked='true'] {
+  background: var(--surface);
+  box-shadow: 0 1px 2px rgb(0 0 0 / 0.1);
+  color: var(--text);
 }
-.primary-button span {
-  margin-left: 24px;
-  font-size: 18px;
-  vertical-align: -1px;
+
+/* Grouped lists */
+.list {
+  overflow: hidden;
+  border-radius: var(--radius-card);
+  background: var(--surface);
 }
-.card-arrow {
-  grid-column: 3;
-  grid-row: 1/3;
-  color: #9ba2aa;
-  font-size: 17px;
-  z-index: 1;
+.list > li + li {
+  border-top: 1px solid var(--line);
 }
-.crumb {
+.list-row {
   display: flex;
+  width: 100%;
+  min-height: 52px;
   align-items: center;
-  gap: 9px;
-  padding: 26px 0 31px;
-  font-size: 12px;
-  color: #9aa1aa;
-}
-.crumb button {
-  background: none;
+  gap: 12px;
+  padding: 8px 12px 8px 16px;
   border: 0;
-  padding: 0;
-  color: #808893;
-  cursor: pointer;
+  background: transparent;
+  color: inherit;
+  text-align: left;
+  transition: background-color 150ms var(--ease);
 }
-.crumb button:hover {
-  color: var(--red);
+a.list-row:active,
+button.list-row:active {
+  background: var(--raised);
 }
-.crumb b {
-  font-weight: 600;
-  color: #303843;
+.list-text {
+  display: grid;
+  min-width: 0;
+  flex: 1;
+  gap: 2px;
 }
-.card-ball {
+.list-text > strong {
+  font-size: 16px;
+  font-weight: 500;
+  line-height: 22px;
+}
+.list-text > small {
+  color: var(--text-3);
+  font-size: 13px;
+  line-height: 18px;
+}
+.list-icon {
+  flex: none;
+  color: var(--text-2);
+}
+.list-chevron {
+  flex: none;
+  color: var(--text-3);
+}
+
+/* Cards and disclosures */
+.card {
+  padding: 16px;
+  border-radius: var(--radius-card);
+  background: var(--surface);
+}
+.disclosure > summary {
+  display: flex;
+  min-height: 44px;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  font-size: 15px;
+  font-weight: 500;
+}
+.disclosure > summary::after {
+  content: '';
+  flex: none;
+  width: 8px;
+  height: 8px;
+  margin: 0 4px 0 auto;
+  border-right: 2px solid var(--text-3);
+  border-bottom: 2px solid var(--text-3);
+  transform: rotate(45deg) translate(-1px, -1px);
+  transition: transform 150ms var(--ease);
+}
+.disclosure[open] > summary::after {
+  transform: rotate(-135deg) translate(-1px, -1px);
+}
+.card.disclosure {
+  padding-block: 4px;
+}
+.disclosure .note {
+  padding-bottom: 12px;
+}
+
+/* Fact sheet */
+.facts {
+  overflow: hidden;
+  border-radius: var(--radius-card);
+  background: var(--surface);
+}
+.fact {
+  display: flex;
+  min-height: 44px;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 10px 16px;
+  font-size: 15px;
+  line-height: 20px;
+}
+.fact + .fact {
+  border-top: 1px solid var(--line);
+}
+.fact dt {
+  flex: none;
+  color: var(--text-2);
+}
+.fact dd {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+
+/* Types */
+.type-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+.type-badge {
+  display: inline-flex;
+  align-items: center;
+  height: 24px;
+  padding: 0 10px;
+  border-radius: 12px;
+  background: var(--type-color);
+  color: var(--type-ink);
+  font-size: 12px;
+  font-weight: 500;
+  line-height: 16px;
+  white-space: nowrap;
+}
+a.type-badge {
+  position: relative;
+}
+/* Expands the tap area of small badges without changing how they sit in a row. */
+a.type-badge::after {
+  content: '';
   position: absolute;
-  width: 100px;
-  height: 100px;
+  inset: -10px -2px;
+}
+.chip {
+  flex: none;
+  min-height: 36px;
+  padding: 0 12px;
+  border: 0;
+  border-radius: 18px;
+  background: var(--surface);
+  box-shadow: inset 0 0 0 1px var(--line);
+  color: var(--text);
+  font-size: 14px;
+  white-space: nowrap;
+  transition:
+    background-color 150ms var(--ease),
+    color 150ms var(--ease);
+}
+.chip[aria-pressed='true'] {
+  background: var(--inverse);
+  box-shadow: none;
+  color: var(--on-inverse);
+}
+.chip-type {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+.chip-type::before {
+  content: '';
+  width: 8px;
+  height: 8px;
   border-radius: 50%;
-  right: -25px;
-  bottom: -39px;
-  border: 12px solid #ffffff47;
-  opacity: 0.55;
+  background: var(--type-color);
+}
+.chip-type[aria-pressed='true'] {
+  background: var(--type-color);
+  color: var(--type-ink);
+}
+.chip-type[aria-pressed='true']::before {
+  background: currentColor;
+}
+.chips-scroll {
+  display: flex;
+  gap: 8px;
+  margin: 12px calc(var(--gutter) * -1) 0;
+  padding: 2px var(--gutter);
+  overflow-x: auto;
+  overscroll-behavior-x: contain;
+  scrollbar-width: none;
+}
+.chips-scroll::-webkit-scrollbar {
+  display: none;
+}
+
+/* Pokémon images. Pixel sprites stay crisp instead of blurring when scaled up. */
+.pokemon-image {
+  object-fit: contain;
+  user-select: none;
+  -webkit-user-select: none;
+  -webkit-touch-callout: none;
+}
+.sprite {
+  image-rendering: pixelated;
+}
+.pokemon-image-missing {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--text-3);
+}
+.list-sprite {
+  flex: none;
+  width: 48px;
+  height: 48px;
+  margin: -4px 0;
+}
+.list-sprite.skeleton {
+  border-radius: 50%;
+}
+.pokemon-tiles {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
+}
+.pokemon-tiles a {
+  display: grid;
+  height: 100%;
+  min-height: 112px;
+  justify-items: center;
+  align-content: start;
+  gap: 2px;
+  padding: 4px 4px 12px;
+  border-radius: 12px;
+  background: var(--surface);
+  text-align: center;
+  font-size: 13px;
+  line-height: 18px;
+}
+.pokemon-tiles .pokemon-image {
+  width: 64px;
+  height: 64px;
+}
+.pokemon-tiles small {
+  color: var(--text-3);
+  font-size: 12px;
+  line-height: 16px;
+}
+
+/* Stats */
+.stat-track {
+  height: 6px;
+  overflow: hidden;
+  border-radius: 3px;
+  background: var(--raised);
+}
+.stat-track i {
+  display: block;
+  height: 100%;
+  border-radius: 3px;
+  background: var(--type-color, var(--text-2));
+  transform-origin: left;
+  transition: transform 300ms var(--ease);
+}
+
+/* States */
+.state {
+  display: grid;
+  justify-items: center;
+  gap: 12px;
+  padding: 40px 16px;
+  color: var(--text-2);
+  font-size: 15px;
+  line-height: 22px;
+  text-align: center;
+}
+.state-title {
+  color: var(--text);
+  font-size: 17px;
+  font-weight: 600;
+}
+.state-error {
+  color: var(--text);
+}
+.spinner {
+  color: var(--text-3);
+  animation: spin 800ms linear infinite;
 }
 @keyframes spin {
   to {
     transform: rotate(360deg);
   }
 }
-.not-found {
-  text-align: center;
-  padding: 65px 0;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 12px;
-}
-.not-found h2 {
-  font-size: 23px;
-  margin: 0 0 4px;
-}
-.not-found .primary-button {
-  margin-top: 7px;
-}
-.not-found button {
-  border: 0;
-  border-radius: 7px;
-  background: #222a35;
-  color: white;
-  padding: 10px 14px;
-  cursor: pointer;
-}
-@media (max-width: 650px) {
-  .page-width {
-    width: calc(100% - 32px);
-  }
-  .primary-button {
-    margin-top: 19px;
-  }
-  .card-arrow {
-    font-size: 13px;
-  }
-  .crumb {
-    padding: 19px 0 22px;
-  }
-}
-@media (prefers-reduced-motion: reduce) {
-  *,
-  *::before,
-  *::after {
-    scroll-behavior: auto !important;
-    animation-duration: 0.01ms !important;
-    animation-iteration-count: 1 !important;
-    transition-duration: 0.01ms !important;
-  }
-}
-.crumb a {
-  color: #808893;
-  text-decoration: none;
-}
-.crumb a:hover {
-  color: var(--red);
-}
-.not-found p {
-  color: #747c86;
-}
-.update-banner {
-  position: fixed;
-  z-index: 20;
-  left: 50%;
-  bottom: calc(16px + var(--safe-bottom));
-  transform: translateX(-50%);
-  display: flex;
-  align-items: center;
-  gap: 14px;
-  padding: 11px 14px;
-  border: 1px solid #e7e9ec;
-  border-radius: 10px;
-  background: #fff;
-  box-shadow: 0 8px 30px #20263020;
-  font-size: 12px;
-}
-.update-banner button {
-  border: 0;
-  border-radius: 6px;
-  background: #202630;
-  color: #fff;
-  padding: 7px 10px;
-  font-size: 11px;
-  cursor: pointer;
-}
-.update-banner button:last-child {
-  background: transparent;
-  color: #6b7480;
-  font-size: 18px;
-  padding: 1px 5px;
-}
-@media (max-width: 650px) {
-  .update-banner {
-    width: calc(100% - 24px);
-    justify-content: space-between;
-    gap: 7px;
-  }
-  .update-banner span {
-    font-size: 11px;
-  }
+.skeleton {
+  background: var(--raised);
+  animation: skeleton 1.2s ease-in-out infinite alternate;
 }
 @keyframes skeleton {
   to {
-    background-position-x: -220%;
+    opacity: 0.5;
   }
 }
-/* Compact the detail hero so its heading, number, and artwork sit higher above the info panel. */
-.ui-button {
-  font: inherit;
-  cursor: pointer;
+
+/* Type matchups */
+.matchups {
+  display: grid;
+  gap: 16px;
+}
+.matchup-group {
+  display: grid;
+  gap: 8px;
+}
+.matchup-group h3 {
+  color: var(--text-2);
+  font-size: 13px;
+  font-weight: 400;
+  line-height: 20px;
+}
+.matchups .disclosure {
+  margin-top: -4px;
+  border-top: 1px solid var(--line);
+  padding-top: 4px;
+}
+.matchups .disclosure > summary {
+  color: var(--text-2);
+  font-size: 13px;
+  font-weight: 400;
+}
+.matchups .disclosure .type-row {
+  padding-bottom: 8px;
+}
+
+.snackbar {
+  position: fixed;
+  z-index: 30;
+  left: max(var(--gutter), var(--safe-left));
+  right: max(var(--gutter), var(--safe-right));
+  bottom: calc(var(--tabbar-h) + var(--safe-bottom) + 8px);
+  display: flex;
+  min-height: 48px;
+  align-items: center;
+  gap: 12px;
+  padding: 4px 8px 4px 16px;
+  border-radius: 12px;
+  background: var(--inverse);
+  box-shadow: var(--shadow-float);
+  color: var(--on-inverse);
+  font-size: 14px;
+  line-height: 20px;
+  animation: page-enter 240ms var(--ease);
+}
+.snackbar span {
+  flex: 1;
+  min-width: 0;
+}
+.snackbar button {
+  flex: none;
+  min-height: 40px;
+  padding: 0 12px;
+  border: 0;
+  background: transparent;
   color: inherit;
+  font-weight: 600;
+}
+
+@media (min-width: 600px) {
+  .pokemon-tiles {
+    grid-template-columns: repeat(auto-fill, minmax(112px, 1fr));
+  }
+}
+@media (min-width: 900px) {
+  .snackbar {
+    left: auto;
+    right: 24px;
+    bottom: 24px;
+    width: 360px;
+  }
+}
+
+/*
+ * Poster surfaces: the type color at full strength, the same in light and dark mode.
+ * At 75% every type keeps dark text above 4.5:1, so text tokens are fixed inside it.
+ */
+.hero-plate {
+  --text: #17181a;
+  --text-2: #17181a;
+  --text-3: #17181a;
+  --accent: #17181a;
+  --line: rgb(23 24 26 / 0.14);
+  background: color-mix(in srgb, var(--type-color) 75%, white);
+  color: #17181a;
+}
+.hero-plate .type-badge {
+  background: rgb(255 255 255 / 0.5);
+  color: #17181a;
+}
+.title-dot {
+  color: var(--accent);
+}
+.hero-plate .title-dot {
+  color: #fff;
+}
+
+/* Artwork on a soft halo with two sparkles. */
+.halo-art {
+  position: relative;
+  display: grid;
+  min-width: 0;
+  place-items: center;
+  aspect-ratio: 1;
+}
+.halo-art > .halo {
+  position: absolute;
+  width: 76%;
+  aspect-ratio: 1;
+  border-radius: 50%;
+  background: rgb(255 255 255 / 0.34);
+}
+.halo-art > .pokemon-image {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  filter: drop-shadow(0 12px 12px rgb(0 0 0 / 0.18));
+}
+.halo-art > .spark {
+  position: absolute;
+  color: #fff;
+  fill: currentColor;
+  stroke: none;
+}
+.halo-art > .spark-one {
+  top: 10%;
+  right: 12%;
+}
+.halo-art > .spark-two {
+  top: 30%;
+  left: 4%;
+  opacity: 0.75;
 }

@@ -1,144 +1,150 @@
-import { useEffect, useState } from 'react'
-import { useInfiniteQuery, useQuery } from '@tanstack/react-query'
+import { useMemo, useState, type ReactNode } from 'react'
+import { useQuery } from '@tanstack/react-query'
+import { ChevronRight, Search, X } from 'lucide-react'
 import { Link, useParams } from 'react-router-dom'
-import { Button } from '../components/ui'
+import { TopBar } from '../components/common/TopBar'
 import {
-  getResource,
-  getResourcePage,
+  EmptyState,
+  ErrorState,
+  LoadingState,
+  PokemonImage,
+  PokemonSprite,
+  TypeBadge,
+} from '../components/ui'
+import {
   formatGeneration,
+  friendlyError,
+  getCompleteResourceIndex,
+  getResource,
   POKEMON_TYPES,
   pokemonIdFromUrl,
   resourceKeys,
   titleCase,
-  TYPE_COLORS,
+  typeVars,
   type NamedResource,
   type ResourceDetail,
   type ResourceKind,
 } from '../lib/pokeapi/client'
+import { useLoadMoreOnScroll } from '../lib/useLoadMoreOnScroll'
+import { usePageTitle } from '../lib/usePageTitle'
 
-const collections: Record<ResourceKind, { title: string; singular: string; description: string }> =
-  {
-    moves: {
-      title: 'Moves',
-      singular: 'Move',
-      description: 'Battle moves, effects, and the Pokémon that can learn them.',
-    },
-    abilities: {
-      title: 'Abilities',
-      singular: 'Ability',
-      description: 'Abilities, their effects, and the Pokémon that have them.',
-    },
-    items: {
-      title: 'Items',
-      singular: 'Item',
-      description: 'Items found across the Pokémon games and the Pokémon that may hold them.',
-    },
-    types: {
-      title: 'Types',
-      singular: 'Type',
-      description: 'Type matchups, related moves, and Pokémon of each type.',
-    },
-  }
+const collections: Record<ResourceKind, { title: string; singular: string }> = {
+  moves: { title: 'Moves', singular: 'Move' },
+  abilities: { title: 'Abilities', singular: 'Ability' },
+  items: { title: 'Items', singular: 'Item' },
+  types: { title: 'Types', singular: 'Type' },
+}
+
+const LIST_BATCH = 40
 
 function isResourceKind(value: string): value is ResourceKind {
   return Object.hasOwn(collections, value)
 }
 
-function usePageTitle(title: string) {
-  useEffect(() => {
-    document.title = `${title} | Pokédex`
-    return () => {
-      document.title = 'Pokédex — Discover Pokémon'
-    }
-  }, [title])
-}
-
 export function ReferenceIndexPage({ kind }: { kind: ResourceKind }) {
   const collection = collections[kind]
-  usePageTitle(`${collection.title} reference`)
-  const query = useInfiniteQuery({
-    queryKey: resourceKeys.list(kind),
-    queryFn: ({ pageParam, signal }) => getResourcePage(kind, pageParam, 24, signal),
-    initialPageParam: 0,
-    getNextPageParam: (lastPage) => {
-      if (!lastPage.next) return undefined
-      return Number(new URL(lastPage.next).searchParams.get('offset') ?? 0)
-    },
+  usePageTitle(collection.title)
+  const [term, setTerm] = useState('')
+  const [limit, setLimit] = useState(LIST_BATCH)
+  const query = useQuery({
+    queryKey: [...resourceKeys.list(kind), 'search-index'],
+    queryFn: ({ signal }) => getCompleteResourceIndex(kind, signal),
+    staleTime: 1000 * 60 * 60 * 24,
   })
-  const resources = (query.data?.pages.flatMap((page) => page.results) ?? []).filter(
-    (resource) =>
-      kind !== 'types' || POKEMON_TYPES.includes(resource.name as (typeof POKEMON_TYPES)[number]),
+  const resources = useMemo(() => {
+    const normalized = term.trim().toLowerCase().replace(/\s+/g, '-')
+    return (query.data?.results ?? []).filter(
+      (resource) =>
+        (kind !== 'types' ||
+          POKEMON_TYPES.includes(resource.name as (typeof POKEMON_TYPES)[number])) &&
+        resource.name.includes(normalized),
+    )
+  }, [kind, query.data, term])
+  const shown = resources.slice(0, limit)
+  const sentinel = useLoadMoreOnScroll(
+    () => setLimit((value) => value + LIST_BATCH),
+    resources.length > limit,
+    shown.length,
   )
-  const total = kind === 'types' ? POKEMON_TYPES.length : query.data?.pages[0]?.count
 
   return (
-    <main className="page-width reference-page">
-      <div className="crumb">
-        <Link to="/">Discover</Link>
-        <span>/</span>
-        <b>{collection.title}</b>
+    <main className="page">
+      <TopBar title={collection.title} back="/" search={false} />
+      <div className="page-body">
+        {kind !== 'types' && (
+          <label className="search-field">
+            <Search size={20} aria-hidden="true" />
+            <input
+              type="search"
+              enterKeyHint="search"
+              autoComplete="off"
+              autoCorrect="off"
+              aria-label={`Filter ${collection.title.toLowerCase()}`}
+              placeholder={`Filter ${collection.title.toLowerCase()}`}
+              value={term}
+              onChange={(event) => {
+                setTerm(event.target.value)
+                setLimit(LIST_BATCH)
+              }}
+            />
+            {term && (
+              <button
+                type="button"
+                className="search-clear"
+                aria-label="Clear filter"
+                onClick={() => setTerm('')}
+              >
+                <X size={18} aria-hidden="true" />
+              </button>
+            )}
+          </label>
+        )}
+        {query.isLoading && <LoadingState label={`Loading ${collection.title.toLowerCase()}`} />}
+        {query.isError && !query.data && (
+          <ErrorState
+            message={friendlyError(query.error, collection.title)}
+            onRetry={() => void query.refetch()}
+          />
+        )}
+        {query.data && (
+          <p className="result-summary" aria-live="polite">
+            {resources.length.toLocaleString()} {collection.title.toLowerCase()}
+          </p>
+        )}
+        {query.data && resources.length === 0 && (
+          <EmptyState title={`No ${collection.title.toLowerCase()} match “${term.trim()}”`} />
+        )}
+        {kind === 'types' ? (
+          <div className="type-tiles">
+            {shown.map((resource) => (
+              <Link
+                key={resource.name}
+                className="type-tile"
+                to={`/types/${resource.name}`}
+                style={typeVars(resource.name)}
+              >
+                {titleCase(resource.name)}
+              </Link>
+            ))}
+          </div>
+        ) : (
+          shown.length > 0 && (
+            <ul className="list">
+              {shown.map((resource) => (
+                <li key={resource.name}>
+                  <Link className="list-row" to={`/${kind}/${resource.name}`}>
+                    <span className="list-text">
+                      <strong>{titleCase(resource.name)}</strong>
+                    </span>
+                    <ChevronRight className="list-chevron" size={18} aria-hidden="true" />
+                  </Link>
+                </li>
+              ))}
+            </ul>
+          )
+        )}
+        <div ref={sentinel} className="scroll-sentinel" aria-hidden="true" />
       </div>
-      <header className="utility-heading">
-        <div className="eyebrow">DISCOVER / REFERENCE</div>
-        <h1>
-          {collection.title}
-          <span>.</span>
-        </h1>
-        <p>{collection.description}</p>
-      </header>
-      <div className="reference-count" aria-live="polite">
-        {total == null
-          ? 'Loading collection…'
-          : `${resources.length} of ${total} ${collection.title.toLowerCase()}`}
-      </div>
-      {query.isError && !query.data && (
-        <div className="error-box" role="alert">
-          {collection.title} could not be loaded. Check your connection and retry.
-          <button onClick={() => void query.refetch()}>Retry</button>
-        </div>
-      )}
-      {query.isError && query.data && (
-        <div className="error-box" role="alert">
-          More {collection.title.toLowerCase()} could not be loaded.
-          <button onClick={() => void query.fetchNextPage()}>Retry</button>
-        </div>
-      )}
-      {query.isLoading && (
-        <div className="loading-state" role="status">
-          <span className="loader" />
-          Loading {collection.title.toLowerCase()}…
-        </div>
-      )}
-      {!query.isLoading && !query.isError && resources.length === 0 && (
-        <div className="empty-state" role="status">
-          No {collection.title.toLowerCase()} are available right now.
-        </div>
-      )}
-      <div className="reference-grid">
-        {resources.map((resource) => (
-          <Link className="reference-card" to={`/${kind}/${resource.name}`} key={resource.name}>
-            <span className="reference-card-id">
-              {kind === 'types'
-                ? 'TYPE'
-                : `#${String(pokemonIdFromUrl(resource.url)).padStart(3, '0')}`}
-            </span>
-            <span className="reference-card-title">{titleCase(resource.name)}</span>
-            <span className="reference-card-arrow" aria-hidden="true">
-              ↗
-            </span>
-          </Link>
-        ))}
-      </div>
-      {query.hasNextPage && (
-        <Button
-          className="load-more"
-          disabled={query.isFetchingNextPage}
-          onClick={() => void query.fetchNextPage()}
-        >
-          {query.isFetchingNextPage ? 'Loading…' : `Load more ${collection.title.toLowerCase()}`}{' '}
-          <span aria-hidden="true">↓</span>
-        </Button>
-      )}
     </main>
   )
 }
@@ -153,460 +159,336 @@ export function ReferenceDetailPage({ kind }: { kind: ResourceKind }) {
     staleTime: 1000 * 60 * 60 * 24,
   })
   const data = query.data
-  usePageTitle(data ? titleCase(data.name) : `${collection.singular} reference`)
+  usePageTitle(data ? titleCase(data.name) : collection.singular)
   if (query.isLoading)
     return (
-      <main className="page-width reference-page">
-        <div className="loading-state" role="status">
-          <span className="loader" />
-          Loading {collection.singular.toLowerCase()}…
-        </div>
+      <main className="page">
+        <TopBar title="" back={`/${kind}`} />
+        <LoadingState label={`Loading ${collection.singular.toLowerCase()}`} />
       </main>
     )
   if (!data)
     return (
-      <main className="page-width reference-page">
-        <div className="crumb">
-          <Link to="/">Discover</Link>
-          <span>/</span>
-          <Link to={`/${kind}`}>{collection.title}</Link>
-        </div>
-        <section className="reference-error" role="alert">
-          <h1>
-            {query.error instanceof Error && 'status' in query.error && query.error.status === 404
-              ? `${collection.singular} not found`
-              : `${collection.singular} unavailable`}
-          </h1>
-          <p>
-            {query.error instanceof Error
-              ? query.error.message
-              : 'This record could not be loaded.'}
-          </p>
-          <Button onClick={() => void query.refetch()}>Retry</Button>
-          <Link to={`/${kind}`}>Back to {collection.title}</Link>
-        </section>
+      <main className="page">
+        <TopBar title={collection.singular} back={`/${kind}`} />
+        <ErrorState
+          message={friendlyError(query.error, `This ${collection.singular.toLowerCase()}`)}
+          onRetry={() => void query.refetch()}
+        />
       </main>
     )
-  return <ReferenceRecord kind={kind} data={data} refreshError={query.isError} onRetry={() => void query.refetch()} />
+  return <ReferenceRecord kind={kind} data={data} />
 }
 
-function ReferenceRecord({ kind, data, refreshError, onRetry }: { kind: ResourceKind; data: ResourceDetail; refreshError: boolean; onRetry: () => void }) {
-  const collection = collections[kind]
-  const effect = data.effect_entries?.find((entry) => entry.language.name === 'en')
-  const flavor = data.flavor_text_entries
-    ?.find((entry) => entry.language.name === 'en')
-    ?.flavor_text.replace(/[\n\f]/g, ' ')
+const cleanText = (value?: string) =>
+  value
+    ?.replace(/[\n\f]/g, ' ')
     .replace(/\s+/g, ' ')
     .trim()
-  const knownTypes = kind === 'types' ? data.damage_relations : undefined
-  const learnedPokemon = data.learned_by_pokemon ?? []
-  const linkedPokemon = data.pokemon?.map((entry) => entry.pokemon) ?? []
-  const heldPokemon = data.held_by_pokemon?.map((entry) => entry.pokemon) ?? []
-  const moveList = data.moves ?? []
-  const relatedPokemon =
-    kind === 'moves'
-      ? learnedPokemon
-      : kind === 'abilities' || kind === 'types'
-        ? linkedPokemon
-        : heldPokemon
+
+function ReferenceRecord({ kind, data }: { kind: ResourceKind; data: ResourceDetail }) {
   const heading = titleCase(data.name)
+  const effect = data.effect_entries?.find((entry) => entry.language.name === 'en')
+  const flavor = cleanText(
+    data.flavor_text_entries?.find((entry) => entry.language.name === 'en')?.flavor_text,
+  )
+  const description =
+    cleanText(effect?.short_effect || effect?.effect)?.replaceAll(
+      '$effect_chance',
+      String(data.effect_chance ?? ''),
+    ) || flavor
 
   return (
-    <main className={`reference-page reference-detail reference-${kind}`}>
-      <div className="page-width">
-        <div className="crumb">
-          <Link to="/">Discover</Link>
-          <span>/</span>
-          <Link to={`/${kind}`}>{collection.title}</Link>
-          <span>/</span>
-          <b>{heading}</b>
-        </div>
-        <header className="reference-detail-heading">
-          <div className="eyebrow">{collection.singular.toUpperCase()} REFERENCE</div>
-          <h1>
-            {heading}
-            <span>.</span>
-          </h1>
-          {data.generation && <p>Introduced in {formatGeneration(data.generation.name)}</p>}
-          {kind === 'types' && (
-            <span
-              className="reference-type-badge"
-              style={{ '--type-color': TYPE_COLORS[data.name] ?? '#9299a2' } as React.CSSProperties}
-            >
-              {heading} type
-            </span>
-          )}
-        </header>
-        {refreshError && (
-          <div className="error-box" role="status">
-            Showing saved details. The latest data could not be refreshed.
-            <button onClick={onRetry}>Retry</button>
-          </div>
-        )}
-        <div className="reference-detail-grid">
-          <section className="reference-main-panel">
-            <h2>
-              {kind === 'moves'
-                ? 'Effect'
-                : kind === 'abilities'
-                  ? 'What it does'
-                  : kind === 'items'
-                    ? 'Description'
-                    : 'Type matchups'}
-            </h2>
-            {kind === 'types' && knownTypes ? (
-              <TypeRelations relations={knownTypes} />
-            ) : effect ? (
-              <p className="reference-effect">
-                {(effect.short_effect || effect.effect).replaceAll(
-                  '$effect_chance',
-                  String(data.effect_chance ?? ''),
-                )}
-              </p>
-            ) : flavor ? (
-              <p className="reference-effect">{flavor}</p>
-            ) : (
-              <p className="muted">
-                No English description is available in PokéAPI for this record.
-              </p>
-            )}
-            {kind === 'moves' && <MoveContext data={data} />}
-            {kind === 'types' && moveList.length > 0 && (
-              <section className="reference-subsection">
-                <h2>Moves of this type</h2>
-                <ResourceLinks kind="moves" entries={moveList} initialCount={16} />
-              </section>
-            )}
-          </section>
-          <aside className="reference-meta-panel">
-            {kind === 'moves' && <MoveMetadata data={data} />}
-            {kind === 'abilities' && data.generation && (
-              <MetadataRow label="Introduced" value={formatGeneration(data.generation.name)} />
-            )}
-            {kind === 'items' && (
-              <>
-                <MetadataRow
-                  label="Category"
-                  value={data.category ? titleCase(data.category.name) : 'Not listed'}
-                />
-                <MetadataRow
-                  label="Cost"
-                  value={
-                    data.cost == null ? 'Not listed' : `${data.cost.toLocaleString()} Pokédollars`
-                  }
-                />
-                {data.fling_power != null && (
-                  <MetadataRow label="Fling power" value={String(data.fling_power)} />
-                )}
-                {data.attributes?.length ? (
-                  <>
-                    <h2>Attributes</h2>
-                    <ul className="reference-plain-list">
-                      {data.attributes.map((attribute) => (
-                        <li key={attribute.name}>{titleCase(attribute.name)}</li>
-                      ))}
-                    </ul>
-                  </>
-                ) : (
-                  <MetadataRow label="Attributes" value="None listed" />
-                )}
-              </>
-            )}
-            {kind === 'types' && (
-              <MetadataRow label="Moves in this type" value={String(data.moves?.length ?? 0)} />
-            )}
-            {kind !== 'types' && data.generation && kind !== 'abilities' && (
-              <MetadataRow label="Introduced" value={formatGeneration(data.generation.name)} />
-            )}
-          </aside>
-        </div>
-        {kind === 'moves' && (
-          <section className="reference-related">
-            <h2>Pokémon that can learn {heading}</h2>
-            <p>
-              PokéAPI lists these Pokémon as compatible. The exact learn method and game version
-              vary by Pokémon; open a Pokémon record to see the methods and version groups included
-              in its data.
-            </p>
-            {relatedPokemon.length ? (
-              <ResourceLinks kind="pokemon" entries={relatedPokemon} initialCount={24} />
-            ) : (
-              <p className="muted">PokéAPI does not list any Pokémon for this move.</p>
-            )}
-          </section>
-        )}
-        {kind === 'abilities' && (
-          <section className="reference-related">
-            <h2>Pokémon with {heading}</h2>
-            {relatedPokemon.length ? (
-              <PokemonAbilityLinks entries={data.pokemon ?? []} initialCount={24} />
-            ) : (
-              <p className="muted">No Pokémon are listed for this ability.</p>
-            )}
-          </section>
-        )}
-        {kind === 'items' && (
-          <section className="reference-related">
-            <h2>Pokémon that may hold {heading}</h2>
-            {data.held_by_pokemon?.length ? (
-              <HeldPokemonLinks entries={data.held_by_pokemon} initialCount={24} />
-            ) : (
-              <p className="muted">PokéAPI does not list any Pokémon that hold this item.</p>
-            )}
-          </section>
+    <main className="page">
+      <TopBar title={heading} back={`/${kind}`} />
+      <div className="page-body">
+        {kind === 'moves' && <MoveFigures data={data} />}
+        {kind === 'items' && data.sprites?.default && (
+          <PokemonImage className="item-art sprite" src={data.sprites.default} alt="" eager />
         )}
         {kind === 'types' && (
-          <section className="reference-related">
-            <h2>Pokémon with the {heading} type</h2>
-            {relatedPokemon.length ? (
-              <ResourceLinks kind="pokemon" entries={relatedPokemon} initialCount={24} />
-            ) : (
-              <p className="muted">No Pokémon are listed for this type.</p>
-            )}
-          </section>
+          <div className="type-banner hero-plate" style={typeVars(data.name)}>
+            <strong>
+              {heading}
+              <span className="title-dot">.</span>
+            </strong>
+            <span>
+              {(data.pokemon?.length ?? 0).toLocaleString()} Pokémon ·{' '}
+              {(data.moves?.length ?? 0).toLocaleString()} moves
+            </span>
+          </div>
+        )}
+        {kind === 'types' && <TypeRelations relations={data.damage_relations} />}
+        {kind !== 'types' &&
+          (description ? (
+            <p className="reference-description">{description}</p>
+          ) : (
+            <p className="note">No English description is listed for this {kind.slice(0, -1)}.</p>
+          ))}
+
+        {kind === 'moves' && <MoveFacts data={data} />}
+        {kind === 'items' && <ItemFacts data={data} />}
+        {kind === 'abilities' && data.generation && (
+          <dl className="facts">
+            <Fact label="Introduced">{formatGeneration(data.generation.name)}</Fact>
+          </dl>
+        )}
+
+        {kind === 'moves' && (
+          <RelatedPokemon
+            title={`Learned by ${data.learned_by_pokemon?.length ?? 0} Pokémon`}
+            entries={(data.learned_by_pokemon ?? []).map((pokemon) => ({ pokemon }))}
+            note="Open a Pokémon to see how and in which game it learns this move."
+          />
+        )}
+        {kind === 'abilities' && (
+          <RelatedPokemon
+            title={`Pokémon with ${heading}`}
+            entries={(data.pokemon ?? []).map(({ pokemon, is_hidden }) => ({
+              pokemon,
+              meta: is_hidden ? 'Hidden' : undefined,
+            }))}
+          />
+        )}
+        {kind === 'items' && (
+          <RelatedPokemon
+            title="Held by wild Pokémon"
+            entries={(data.held_by_pokemon ?? []).map(({ pokemon, version_details: versions }) => ({
+              pokemon,
+              meta: versions[0] ? `${versions[0].rarity}%` : undefined,
+            }))}
+          />
+        )}
+        {kind === 'types' && (
+          <>
+            <RelatedPokemon
+              title={`${heading} Pokémon`}
+              entries={(data.pokemon ?? []).map(({ pokemon }) => ({ pokemon }))}
+            />
+            <TypeMoves moves={data.moves ?? []} />
+          </>
         )}
       </div>
     </main>
   )
 }
 
-function TypeRelations({
-  relations,
-}: {
-  relations: NonNullable<ResourceDetail['damage_relations']>
-}) {
-  const groups: { label: string; caption: string; entries: NamedResource[] }[] = [
-    {
-      label: 'Deals 2× damage to',
-      caption: 'Super effective',
-      entries: relations.double_damage_to,
-    },
-    {
-      label: 'Deals ½ damage to',
-      caption: 'Not very effective',
-      entries: relations.half_damage_to,
-    },
-    { label: 'Deals no damage to', caption: 'No effect', entries: relations.no_damage_to },
-    { label: 'Takes 2× damage from', caption: 'Weak to', entries: relations.double_damage_from },
-    { label: 'Takes ½ damage from', caption: 'Resists', entries: relations.half_damage_from },
-    { label: 'Takes no damage from', caption: 'Immune to', entries: relations.no_damage_from },
+function Fact({ label, children }: { label: string; children: ReactNode }) {
+  return (
+    <div className="fact">
+      <dt>{label}</dt>
+      <dd>{children}</dd>
+    </div>
+  )
+}
+
+function MoveFigures({ data }: { data: ResourceDetail }) {
+  const figures: [string, string][] = [
+    ['Power', data.power == null ? '—' : String(data.power)],
+    ['Accuracy', data.accuracy == null ? '—' : `${data.accuracy}%`],
+    ['PP', data.pp == null ? '—' : String(data.pp)],
+  ]
+  return (
+    <div className="move-figures hero-plate" style={typeVars(data.type?.name)}>
+      {figures.map(([label, value]) => (
+        <div key={label}>
+          <b>{value}</b>
+          <span>{label}</span>
+        </div>
+      ))}
+    </div>
+  )
+}
+
+function MoveFacts({ data }: { data: ResourceDetail }) {
+  const machineGames = [
+    ...new Set((data.machines ?? []).map(({ version_group }) => titleCase(version_group.name))),
   ]
   return (
     <>
-      <p className="muted">
-        These are single-type relationships. Dual types and game-specific battle modifiers can
-        change the overall result.
-      </p>
-      <div className="reference-type-relations">
-        {groups.map((group) => (
-          <div className="type-relation-row" key={group.label}>
-            <strong>{group.caption}</strong>
-            <span>{group.label}</span>
-            {group.entries.length ? (
-              <div className="reference-type-chips">
-                {group.entries.map((entry) => (
-                  <Link
-                    key={entry.name}
-                    to={`/types/${entry.name}`}
-                    style={
-                      {
-                        '--type-color': TYPE_COLORS[entry.name] ?? '#9299a2',
-                      } as React.CSSProperties
-                    }
-                  >
-                    {titleCase(entry.name)}
-                  </Link>
-                ))}
-              </div>
-            ) : (
-              <span className="muted">None</span>
-            )}
-          </div>
-        ))}
-      </div>
+      <dl className="facts">
+        {data.type && (
+          <Fact label="Type">
+            <TypeBadge type={data.type.name} link />
+          </Fact>
+        )}
+        {data.damage_class && <Fact label="Class">{titleCase(data.damage_class.name)}</Fact>}
+        {data.priority != null && <Fact label="Priority">{data.priority}</Fact>}
+        {data.target && <Fact label="Target">{titleCase(data.target.name)}</Fact>}
+        {data.generation && (
+          <Fact label="Introduced">{formatGeneration(data.generation.name)}</Fact>
+        )}
+      </dl>
+      {machineGames.length > 0 && (
+        <details className="card disclosure">
+          <summary>
+            Available as a machine <span className="count">{machineGames.length} games</span>
+          </summary>
+          <p className="note">{machineGames.join(', ')}</p>
+        </details>
+      )}
     </>
   )
 }
 
-function MoveContext({ data }: { data: ResourceDetail }) {
-  const versionGroups = [
-    ...new Map(
-      (data.machines ?? []).map(({ version_group }) => [version_group.name, version_group]),
-    ).values(),
-  ]
+function ItemFacts({ data }: { data: ResourceDetail }) {
   return (
-    <section className="reference-subsection">
-      <h2>Game and learn-method context</h2>
-      <p className="muted">
-        This move record does not include per-Pokémon learn methods. Check an individual Pokémon’s
-        move data for methods, level, and version group.
-      </p>
-      <div className="metadata-row">
-        <span>Machine availability</span>
-        <strong>
-          {versionGroups.length
-            ? versionGroups.map((group) => titleCase(group.name)).join(', ')
-            : 'No machine versions listed'}
-        </strong>
-      </div>
-    </section>
+    <dl className="facts">
+      {data.category && <Fact label="Category">{titleCase(data.category.name)}</Fact>}
+      {data.cost ? <Fact label="Cost">{data.cost.toLocaleString()} Pokédollars</Fact> : null}
+      {data.fling_power != null && <Fact label="Fling power">{data.fling_power}</Fact>}
+      {data.generation && <Fact label="Introduced">{formatGeneration(data.generation.name)}</Fact>}
+      {data.attributes?.length ? (
+        <Fact label="Attributes">
+          {data.attributes.map((attribute) => titleCase(attribute.name)).join(', ')}
+        </Fact>
+      ) : null}
+    </dl>
   )
 }
 
-function MoveMetadata({ data }: { data: ResourceDetail }) {
-  const fields: [string, string][] = [
-    ['Damage class', data.damage_class ? titleCase(data.damage_class.name) : 'Not listed'],
-    ['Power', data.power == null ? 'Not applicable / not listed' : String(data.power)],
-    ['Accuracy', data.accuracy == null ? 'Not applicable / not listed' : `${data.accuracy}%`],
-    ['PP', data.pp == null ? 'Not listed' : String(data.pp)],
-    ['Priority', data.priority == null ? 'Not listed' : String(data.priority)],
-    ['Target', data.target ? titleCase(data.target.name) : 'Not listed'],
+function TypeRelations({ relations }: { relations: ResourceDetail['damage_relations'] }) {
+  if (!relations) return null
+  const blocks: { title: string; groups: [string, NamedResource[]][] }[] = [
+    {
+      title: 'When attacking',
+      groups: [
+        ['2× damage to', relations.double_damage_to],
+        ['½ damage to', relations.half_damage_to],
+        ['No damage to', relations.no_damage_to],
+      ],
+    },
+    {
+      title: 'When defending',
+      groups: [
+        ['Takes 2× from', relations.double_damage_from],
+        ['Takes ½ from', relations.half_damage_from],
+        ['Immune to', relations.no_damage_from],
+      ],
+    },
   ]
   return (
     <>
-      <div className="metadata-row">
-        <span>Type</span>
-        <strong>
-          {data.type ? (
-            <Link to={`/types/${data.type.name}`}>{titleCase(data.type.name)}</Link>
-          ) : (
-            'Not listed'
-          )}
-        </strong>
-      </div>
-      {fields.map(([label, value]) => (
-        <MetadataRow key={label} label={label} value={value} />
+      {blocks.map(({ title, groups }, blockIndex) => (
+        <section
+          className={`section ${blockIndex === 0 ? 'section-after-banner' : ''}`}
+          key={title}
+          aria-label={title}
+        >
+          <h2 className="section-title">{title}</h2>
+          <div className="card matchups">
+            {groups.map(([label, entries]) =>
+              entries.length ? (
+                <div className="matchup-group" key={label}>
+                  <h3>{label}</h3>
+                  <div className="type-row">
+                    {entries.map((entry) => (
+                      <TypeBadge key={entry.name} type={entry.name} link />
+                    ))}
+                  </div>
+                </div>
+              ) : null,
+            )}
+          </div>
+        </section>
       ))}
     </>
   )
 }
 
-function MetadataRow({ label, value }: { label: string; value: string }) {
+function ExpandButton({
+  total,
+  initial,
+  expanded,
+  onToggle,
+}: {
+  total: number
+  initial: number
+  expanded: boolean
+  onToggle: () => void
+}) {
+  if (total <= initial) return null
   return (
-    <div className="metadata-row">
-      <span>{label}</span>
-      <strong>{value}</strong>
-    </div>
+    <button type="button" className="button button-secondary button-block" onClick={onToggle}>
+      {expanded ? 'Show fewer' : `Show all ${total}`}
+    </button>
   )
 }
 
-function ResourceLinks({
-  kind,
+function RelatedPokemon({
+  title,
   entries,
-  initialCount,
+  note,
+  initialCount = 24,
 }: {
-  kind: 'moves' | 'pokemon'
-  entries: NamedResource[]
-  initialCount: number
+  title: string
+  entries: { pokemon: NamedResource; meta?: string }[]
+  note?: string
+  initialCount?: number
 }) {
-  const [showMore, setShowMore] = useState(false)
-  const visible = showMore ? entries : entries.slice(0, initialCount)
+  const [expanded, setExpanded] = useState(false)
+  if (!entries.length) return null
+  const visible = expanded ? entries : entries.slice(0, initialCount)
   return (
-    <>
-      <ul className="reference-related-grid">
-        {visible.map((entry) => (
-          <li key={entry.name}>
-            <Link to={kind === 'pokemon' ? `/pokemon/${entry.name}` : `/moves/${entry.name}`}>
-              {titleCase(entry.name)}
-              <span aria-hidden="true">↗</span>
+    <section className="section" aria-label={title}>
+      <h2 className="section-title">{title}</h2>
+      {note && <p className="note">{note}</p>}
+      <ul className="pokemon-tiles">
+        {visible.map(({ pokemon, meta }) => (
+          <li key={pokemon.name}>
+            <Link to={`/pokemon/${pokemon.name}`}>
+              <PokemonSprite id={pokemonIdFromUrl(pokemon.url)} />
+              <span>{titleCase(pokemon.name)}</span>
+              {meta && <small>{meta}</small>}
             </Link>
           </li>
         ))}
       </ul>
-      {entries.length > initialCount && (
-        <button className="reference-expand" onClick={() => setShowMore((value) => !value)}>
-          {showMore ? 'Show fewer' : `Show ${entries.length - initialCount} more`}
-        </button>
-      )}
-    </>
+      <ExpandButton
+        total={entries.length}
+        initial={initialCount}
+        expanded={expanded}
+        onToggle={() => setExpanded((value) => !value)}
+      />
+    </section>
   )
 }
 
-function PokemonAbilityLinks({
-  entries,
-  initialCount,
-}: {
-  entries: NonNullable<ResourceDetail['pokemon']>
-  initialCount: number
-}) {
-  const [showMore, setShowMore] = useState(false)
-  const visible = showMore ? entries : entries.slice(0, initialCount)
+function TypeMoves({ moves }: { moves: NamedResource[] }) {
+  const [expanded, setExpanded] = useState(false)
+  const initial = 12
+  if (!moves.length) return null
   return (
-    <>
-      <ul className="reference-related-grid">
-        {visible.map((entry) => (
-          <li key={entry.pokemon.name}>
-            <Link to={`/pokemon/${entry.pokemon.name}`}>
-              {titleCase(entry.pokemon.name)}
-              {entry.is_hidden && <small>Hidden ability</small>}
-              <span aria-hidden="true">↗</span>
+    <section className="section" aria-label="Moves of this type">
+      <h2 className="section-title">
+        Moves <span className="count">{moves.length}</span>
+      </h2>
+      <ul className="list">
+        {(expanded ? moves : moves.slice(0, initial)).map((move) => (
+          <li key={move.name}>
+            <Link className="list-row" to={`/moves/${move.name}`}>
+              <span className="list-text">
+                <strong>{titleCase(move.name)}</strong>
+              </span>
+              <ChevronRight className="list-chevron" size={18} aria-hidden="true" />
             </Link>
           </li>
         ))}
       </ul>
-      {entries.length > initialCount && (
-        <button className="reference-expand" onClick={() => setShowMore((value) => !value)}>
-          {showMore ? 'Show fewer' : `Show ${entries.length - initialCount} more`}
-        </button>
-      )}
-    </>
-  )
-}
-
-function HeldPokemonLinks({
-  entries,
-  initialCount,
-}: {
-  entries: NonNullable<ResourceDetail['held_by_pokemon']>
-  initialCount: number
-}) {
-  const [showMore, setShowMore] = useState(false)
-  const visible = showMore ? entries : entries.slice(0, initialCount)
-  return (
-    <>
-      <ul className="reference-related-grid">
-        {visible.map((entry) => (
-          <li key={entry.pokemon.name}>
-            <Link to={`/pokemon/${entry.pokemon.name}`}>
-              {titleCase(entry.pokemon.name)}
-              {entry.version_details[0] && (
-                <small>
-                  {titleCase(entry.version_details[0].version.name)} ·{' '}
-                  {entry.version_details[0].rarity}%
-                </small>
-              )}
-              <span aria-hidden="true">↗</span>
-            </Link>
-          </li>
-        ))}
-      </ul>
-      {entries.length > initialCount && (
-        <button className="reference-expand" onClick={() => setShowMore((value) => !value)}>
-          {showMore ? 'Show fewer' : `Show ${entries.length - initialCount} more`}
-        </button>
-      )}
-    </>
+      <ExpandButton
+        total={moves.length}
+        initial={initial}
+        expanded={expanded}
+        onToggle={() => setExpanded((value) => !value)}
+      />
+    </section>
   )
 }
 
 export function ReferenceRoute({ kind }: { kind: string }) {
-  return isResourceKind(kind) ? (
-    <ReferenceIndexPage kind={kind} />
-  ) : (
-    <main className="page-width reference-page">
-      <h1>Reference collection not found</h1>
-      <Link to="/">Back to Discover</Link>
-    </main>
-  )
+  return isResourceKind(kind) ? <ReferenceIndexPage key={kind} kind={kind} /> : null
 }
 
 export function ReferenceDetailRoute({ kind }: { kind: string }) {
-  return isResourceKind(kind) ? (
-    <ReferenceDetailPage kind={kind} />
-  ) : (
-    <main className="page-width reference-page">
-      <h1>Reference record not found</h1>
-      <Link to="/">Back to Discover</Link>
-    </main>
-  )
+  return isResourceKind(kind) ? <ReferenceDetailPage kind={kind} /> : null
 }

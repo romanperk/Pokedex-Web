@@ -1,31 +1,27 @@
-import { useEffect, useState } from 'react'
+import { useEffect } from 'react'
 import { Link, Outlet, ScrollRestoration, useLocation, useNavigate } from 'react-router-dom'
-import { BookOpen, Compass, Heart, Search, Wrench } from 'lucide-react'
+import { BookOpen, Compass, UserRound, Wrench } from 'lucide-react'
+import '../../lib/theme'
+import { useOnlineStatus } from '../../lib/useOnlineStatus'
+import { BrandMark } from './BrandMark'
 
-type InstallPromptEvent = Event & {
-  prompt: () => Promise<void>
-  userChoice: Promise<{ outcome: string }>
-}
 const destinations = [
-  { label: 'Discover', to: '/', icon: Compass, end: true },
-  { label: 'Pokédex', to: '/pokedex', icon: BookOpen },
-  { label: 'Tools', to: '/tools', icon: Wrench },
-  { label: 'My Pokémon', to: '/my-pokemon', icon: Heart },
+  {
+    label: 'Discover',
+    to: '/',
+    icon: Compass,
+    match: /^\/((moves|abilities|items|item|types)(\/|$)|$)/,
+  },
+  { label: 'Pokédex', to: '/pokedex', icon: BookOpen, match: /^\/(pokedex|pokemon)(\/|$)/ },
+  { label: 'Tools', to: '/tools', icon: Wrench, match: /^\/(tools|compare)(\/|$)/ },
+  { label: 'Trainer', to: '/trainer', icon: UserRound, match: /^\/trainer(\/|$)/ },
 ]
 
 export function AppShell() {
   const location = useLocation()
   const navigate = useNavigate()
-  const [installPrompt, setInstallPrompt] = useState<InstallPromptEvent | null>(null)
-  const [installMessage, setInstallMessage] = useState('')
-  useEffect(() => {
-    const capture = (event: Event) => {
-      event.preventDefault()
-      setInstallPrompt(event as InstallPromptEvent)
-    }
-    window.addEventListener('beforeinstallprompt', capture)
-    return () => window.removeEventListener('beforeinstallprompt', capture)
-  }, [])
+  const isOnline = useOnlineStatus()
+
   useEffect(() => {
     const onShortcut = (event: KeyboardEvent) => {
       if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === 'k') {
@@ -36,74 +32,37 @@ export function AppShell() {
     window.addEventListener('keydown', onShortcut)
     return () => window.removeEventListener('keydown', onShortcut)
   }, [navigate])
-  async function installApp() {
-    if (!installPrompt) return
-    await installPrompt.prompt()
-    setInstallMessage(
-      (await installPrompt.userChoice).outcome === 'accepted' ? 'Install started.' : '',
-    )
-    setInstallPrompt(null)
-  }
-  const navigation = (className = '') => (
-    <nav className={className} aria-label="Main navigation">
-      {destinations.map(({ label, to, icon: Icon, end }) => {
-        const isActive = end
-          ? location.pathname === '/' ||
-            /^\/(moves|abilities|items|types)(\/|$)/.test(location.pathname)
-          : to === '/pokedex'
-            ? location.pathname === '/pokedex' || location.pathname.startsWith('/pokemon/')
-            : location.pathname === to ||
-              location.pathname.startsWith(to + '/') ||
-              (to === '/tools' && location.pathname === '/compare')
-        return (
-          <Link
-            key={to}
-            to={to}
-            aria-current={isActive ? 'page' : undefined}
-            className={isActive ? 'nav-active' : ''}
-          >
-            <Icon size={18} aria-hidden="true" />
-            <span>{label}</span>
-          </Link>
-        )
-      })}
-    </nav>
-  )
+
   return (
     <div className="app-shell">
-      <header className="topbar">
-        <Link className="brand" to="/" aria-label="Pokédex home">
-          <span className="brand-ball" aria-hidden="true">
-            <i />
-          </span>
-          <span>
-            Poké<span className="brand-red">dex</span>
-          </span>
+      <nav className="tabbar" aria-label="Main">
+        <Link className="tabbar-brand" to="/">
+          <BrandMark />
+          Pokédex
         </Link>
-        {navigation()}
-        <Link
-          className="top-search"
-          to="/search"
-          aria-label="Search Pokémon and reference collections"
-          title="Search Pokémon and reference collections"
-        >
-          <Search size={19} aria-hidden="true" />
-        </Link>
-      </header>
-      {installPrompt && (
-        <div className="install-help">
-          <button type="button" onClick={() => void installApp()}>
-            Install app
-          </button>
-          <span className="visually-hidden" role="status">
-            {installMessage}
-          </span>
-        </div>
-      )}
-      <div className="route-content">
+        {destinations.map(({ label, to, icon: Icon, match }) => {
+          const active = match.test(location.pathname)
+          return (
+            <Link
+              key={to}
+              to={to}
+              className="tabbar-item"
+              aria-current={active ? 'page' : undefined}
+            >
+              <Icon size={24} strokeWidth={active ? 2.25 : 1.75} aria-hidden="true" />
+              <span>{label}</span>
+            </Link>
+          )
+        })}
+      </nav>
+      <div className="app-main">
+        {!isOnline && (
+          <p className="offline-bar" role="status">
+            You’re offline. Showing what’s saved on this device.
+          </p>
+        )}
         <Outlet />
       </div>
-      {navigation('mobile-nav')}
       <ScrollRestoration />
     </div>
   )

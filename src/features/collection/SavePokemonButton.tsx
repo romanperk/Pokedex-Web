@@ -1,30 +1,32 @@
 import { useState } from 'react'
 import { Check, Plus } from 'lucide-react'
-import { useSavedPokemon, toggleSavedPokemon } from './savedPokemon'
+import { titleCase } from '../../lib/pokeapi/client'
+import { toggleSavedPokemon, useSavedPokemon } from './savedPokemon'
 
 export function SavePokemonButton({ name }: { name: string }) {
   const saved = useSavedPokemon().includes(name.toLowerCase())
   const [message, setMessage] = useState('')
+  const label = titleCase(name)
   function toggle() {
     const result = toggleSavedPokemon(name)
     setMessage(
       !result.persisted
         ? 'Browser storage is unavailable. Your change remains for this session only.'
         : result.saved
-          ? `${name} marked as owned on this device.`
-          : `${name} removed from your owned collection.`,
+          ? `${label} marked as owned on this device.`
+          : `${label} removed from your collection.`,
     )
   }
   return (
     <>
       <button
-        className="save-pokemon"
+        className={`button save-pokemon ${saved ? 'save-pokemon-owned' : ''}`}
         type="button"
-        aria-label={saved ? `Remove ${name} from your owned collection` : `Mark ${name} as owned`}
         aria-pressed={saved}
+        aria-label={`${label} owned`}
         onClick={toggle}
       >
-        {saved ? <Check size={17} aria-hidden="true" /> : <Plus size={17} aria-hidden="true" />}
+        {saved ? <Check size={16} aria-hidden="true" /> : <Plus size={16} aria-hidden="true" />}
         <span>{saved ? 'Owned' : 'Mark owned'}</span>
       </button>
       <span className="visually-hidden" aria-live="polite">

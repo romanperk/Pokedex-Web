@@ -88,17 +88,17 @@ export type PokemonEncounter = {
     }[]
   }[]
 }
-export type PokemonList = { count: number; next: string | null; results: NamedResource[] }
+export type DamageRelations = {
+  double_damage_to: NamedResource[]
+  half_damage_to: NamedResource[]
+  no_damage_to: NamedResource[]
+  double_damage_from: NamedResource[]
+  half_damage_from: NamedResource[]
+  no_damage_from: NamedResource[]
+}
 export type PokemonTypeList = {
-  pokemon: { pokemon: NamedResource }[]
-  damage_relations: {
-    double_damage_to: NamedResource[]
-    half_damage_to: NamedResource[]
-    no_damage_to: NamedResource[]
-    double_damage_from: NamedResource[]
-    half_damage_from: NamedResource[]
-    no_damage_from: NamedResource[]
-  }
+  pokemon: { slot: number; pokemon: NamedResource }[]
+  damage_relations: DamageRelations
 }
 
 export type ResourceKind = 'moves' | 'abilities' | 'items' | 'types'
@@ -138,14 +138,7 @@ export type ResourceDetail = {
   }[]
   pokemon?: { pokemon: NamedResource; is_hidden?: boolean; slot?: number }[]
   moves?: NamedResource[]
-  damage_relations?: {
-    double_damage_to: NamedResource[]
-    half_damage_to: NamedResource[]
-    no_damage_to: NamedResource[]
-    double_damage_from: NamedResource[]
-    half_damage_from: NamedResource[]
-    no_damage_from: NamedResource[]
-  }
+  damage_relations?: DamageRelations
 }
 
 const API = 'https://pokeapi.co/api/v2'
@@ -177,7 +170,10 @@ export async function fetchJson<T>(url: string, signal?: AbortSignal): Promise<T
 }
 
 export const getPokemonPage = (offset: number, limit = 20, signal?: AbortSignal) =>
-  fetchJson<PokemonList>(`${API}/pokemon?limit=${limit}&offset=${offset}`, signal)
+  fetchJson<ResourceIndex>(`${API}/pokemon?limit=${limit}&offset=${offset}`, signal)
+
+/** Every Pokémon name, species in Pokédex order ahead of alternate forms. */
+export const getPokemonDirectory = (signal?: AbortSignal) => getPokemonPage(0, 2000, signal)
 
 export const getPokemon = (nameOrId: string | number, signal?: AbortSignal) =>
   fetchJson<Pokemon>(`${API}/pokemon/${encodeURIComponent(String(nameOrId).toLowerCase())}`, signal)
@@ -196,9 +192,6 @@ export const getPokemonEncounters = (nameOrId: string | number, signal?: AbortSi
     `${API}/pokemon/${encodeURIComponent(String(nameOrId).toLowerCase())}/encounters`,
     signal,
   )
-
-export const getPokemonSpeciesCount = async (signal?: AbortSignal) =>
-  (await fetchJson<{ count: number }>(`${API}/pokemon-species?limit=1`, signal)).count
 
 export const getPokemonType = (type: string, signal?: AbortSignal) =>
   fetchJson<PokemonTypeList>(`${API}/type/${encodeURIComponent(type)}`, signal)
@@ -250,11 +243,9 @@ export const pokemonIdFromUrl = (url: string) => {
 }
 
 export const pokemonKeys = {
-  lists: ['pokemon', 'list'] as const,
   directory: ['pokemon', 'directory'] as const,
   encounters: (nameOrId: string | number) =>
     ['pokemon', 'encounters', String(nameOrId).toLowerCase()] as const,
-  speciesCount: ['pokemon', 'species-count'] as const,
   evolution: (url: string) => ['pokemon', 'evolution', url] as const,
   list: (types: string[]) => ['pokemon', 'list', [...types].sort()] as const,
   detail: (nameOrId: string | number) =>
@@ -262,7 +253,6 @@ export const pokemonKeys = {
   species: (nameOrId: string | number) =>
     ['pokemon', 'species', String(nameOrId).toLowerCase()] as const,
   type: (type: string) => ['pokemon', 'type', type] as const,
-  search: (term: string) => ['pokemon', 'search', term.toLowerCase()] as const,
 }
 
 export const POKEMON_TYPES = [

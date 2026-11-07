@@ -292,10 +292,6 @@ button.list-row:active {
   font-size: 13px;
   line-height: 18px;
 }
-.list-icon {
-  flex: none;
-  color: var(--text-2);
-}
 .list-chevron {
   flex: none;
   color: var(--text-3);

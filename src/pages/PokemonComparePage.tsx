@@ -1,20 +1,18 @@
 import { useEffect, useMemo, useState } from 'react'
-import { useQueries, useQuery } from '@tanstack/react-query'
 import { Plus, Search, X } from 'lucide-react'
 import { Link, useSearchParams } from 'react-router-dom'
 import { TopBar } from '../components/common/TopBar'
 import { EmptyState, ErrorState, PokemonSprite, TypeBadge } from '../components/ui'
 import {
-  getPokemon,
-  getPokemonPage,
   paddedId,
   pokemonIdFromUrl,
-  pokemonKeys,
   statLabel,
   titleCase,
   type Pokemon,
 } from '../lib/pokeapi/client'
 import { MAX_COMPARE, readComparison, saveComparison } from '../features/pokedex/comparison'
+import { matchResources } from '../features/pokedex/matchResources'
+import { usePokemonDetails, usePokemonDirectory } from '../features/pokedex/usePokemonPages'
 import { usePageTitle } from '../lib/usePageTitle'
 
 function initialSelection(add: string | null): string[] {
@@ -36,36 +34,17 @@ export function PokemonComparePage() {
   useEffect(() => saveComparison(selection), [selection])
 
   const full = selection.length >= MAX_COMPARE
-  const directory = useQuery({
-    queryKey: pokemonKeys.directory,
-    queryFn: ({ signal }) => getPokemonPage(0, 2000, signal),
-    enabled: !full,
-    staleTime: 1000 * 60 * 60 * 24,
-  })
-  const details = useQueries({
-    queries: selection.map((name) => ({
-      queryKey: pokemonKeys.detail(name),
-      queryFn: ({ signal }: { signal: AbortSignal }) => getPokemon(name, signal),
-      staleTime: 1000 * 60 * 60 * 12,
-    })),
-  })
-  const suggestions = useMemo(() => {
-    const normalized = term.trim().toLowerCase().replace(/\s+/g, '-').replace(/^#/, '')
-    if (!normalized || !directory.data) return []
-    const numericId = /^\d+$/.test(normalized) ? Number(normalized) : null
-    return directory.data.results
-      .filter(
-        (resource) =>
-          !selection.includes(resource.name) &&
-          (resource.name.includes(normalized) || pokemonIdFromUrl(resource.url) === numericId),
-      )
-      .sort(
-        (a, b) =>
-          Number(!a.name.startsWith(normalized)) - Number(!b.name.startsWith(normalized)) ||
-          pokemonIdFromUrl(a.url) - pokemonIdFromUrl(b.url),
-      )
-      .slice(0, 6)
-  }, [directory.data, selection, term])
+  const directory = usePokemonDirectory(!full)
+  const details = usePokemonDetails(selection)
+  const suggestions = useMemo(
+    () =>
+      matchResources(
+        (directory.data?.results ?? []).filter((resource) => !selection.includes(resource.name)),
+        term,
+        { matchId: true },
+      ).slice(0, 6),
+    [directory.data, selection, term],
+  )
 
   function add(name: string) {
     setSelection((current) => [...current, name].slice(0, MAX_COMPARE))

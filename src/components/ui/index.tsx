@@ -94,6 +94,15 @@ export function TypeBadge({ type, link = false }: { type: string; link?: boolean
   )
 }
 
+export function Fact({ label, children }: { label: string; children: ReactNode }) {
+  return (
+    <div className="fact">
+      <dt>{label}</dt>
+      <dd>{children}</dd>
+    </div>
+  )
+}
+
 export function LoadingState({ label }: { label: string }) {
   return (
     <div className="state" role="status">

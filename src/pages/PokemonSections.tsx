@@ -208,7 +208,10 @@ export function LearnsetSection({ moves }: { moves: PokemonMove[] }) {
         ?.name ?? versionGroups[0]?.name
     )
   }, [moves, versionGroups])
-  const group = selectedGroup || defaultGroup
+  // The choice survives moving to another Pokémon, which may not appear in that game.
+  const group = versionGroups.some((version) => version.name === selectedGroup)
+    ? selectedGroup
+    : defaultGroup
   const methods = useMemo(() => {
     const grouped = new Map<string, { name: string; level: number }[]>()
     for (const { move, version_group_details } of moves) {

@@ -1,9 +1,8 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { useQueries } from '@tanstack/react-query'
 import { Download, Monitor, Moon, Search, Sun, Upload, X } from 'lucide-react'
 import { Link } from 'react-router-dom'
 import { TopBar } from '../components/common/TopBar'
-import { DexNumber, EmptyState, PokemonSprite, TypeBadge } from '../components/ui'
+import { DexNumber, EmptyState, ErrorState, PokemonSprite, TypeBadge } from '../components/ui'
 import {
   exportCollection,
   importCollection,
@@ -13,7 +12,8 @@ import {
   useCollectionStorageUnavailable,
   type CollectionEntry,
 } from '../features/collection/savedPokemon'
-import { getPokemon, pokemonKeys, SPECIES_COUNT, titleCase } from '../lib/pokeapi/client'
+import { usePokemonSummaries } from '../features/pokedex/usePokemonPages'
+import { SPECIES_COUNT, titleCase } from '../lib/pokeapi/client'
 import { usePageTitle } from '../lib/usePageTitle'
 import { setThemePreference, useThemePreference, type ThemePreference } from '../lib/theme'
 
@@ -62,27 +62,18 @@ export function TrainerPage() {
   const [search, setSearch] = useState('')
   const [importMode, setImportMode] = useState<'merge' | 'replace'>('merge')
   const [notice, setNotice] = useState<Notice | null>(null)
-  const queries = useQueries({
-    queries: entries.map((entry) => ({
-      queryKey: pokemonKeys.detail(entry.name),
-      queryFn: ({ signal }: { signal: AbortSignal }) => getPokemon(entry.name, signal),
-      staleTime: 1000 * 60 * 60 * 12,
-    })),
-  })
+  const { summaries, ready, failed, retry } = usePokemonSummaries()
   const visibleEntries = useMemo(() => {
-    const indexed = entries
-      .map((entry, index) => ({ entry, index }))
-      .filter(({ entry }) =>
-        titleCase(entry.name).toLowerCase().includes(search.trim().toLowerCase()),
-      )
+    const matching = entries.filter((entry) =>
+      titleCase(entry.name).toLowerCase().includes(search.trim().toLowerCase()),
+    )
     // Entries are stored oldest first.
-    return sortByName
-      ? indexed.sort((a, b) => a.entry.name.localeCompare(b.entry.name))
-      : indexed.reverse()
+    return sortByName ? matching.sort((a, b) => a.name.localeCompare(b.name)) : matching.reverse()
   }, [entries, search, sortByName])
   // Alternate forms use ids above the species range and don't count toward the Pokédex total.
   const ownedSpecies =
-    entries.length - queries.filter((query) => (query.data?.id ?? 0) > SPECIES_COUNT).length
+    entries.length -
+    entries.filter((entry) => (summaries.get(entry.name)?.id ?? 0) > SPECIES_COUNT).length
 
   useEffect(() => {
     if (!notice) return
@@ -203,7 +194,8 @@ export function TrainerPage() {
             </EmptyState>
           ) : (
             <>
-              {entries.length > 5 && (
+              {/* Stays while a search is active, or removing a match could trap the filter on. */}
+              {(entries.length > 5 || search) && (
                 <label className="search-field search-field-surface">
                   <Search size={20} aria-hidden="true" />
                   <input
@@ -217,13 +209,13 @@ export function TrainerPage() {
                   />
                 </label>
               )}
+              {failed && <ErrorState message="Pokémon details could not load." onRetry={retry} />}
               {visibleEntries.length === 0 ? (
                 <EmptyState title="No matches">Try another name.</EmptyState>
               ) : (
                 <ul className="list">
-                  {visibleEntries.map(({ entry, index }) => {
-                    const query = queries[index]
-                    const pokemon = query?.data
+                  {visibleEntries.map((entry) => {
+                    const pokemon = summaries.get(entry.name)
                     return (
                       <li className="collection-row" key={entry.name}>
                         {pokemon ? (
@@ -233,8 +225,8 @@ export function TrainerPage() {
                               <strong>{titleCase(pokemon.name)}</strong>
                               <span className="collection-meta">
                                 <DexNumber id={pokemon.id} />
-                                {pokemon.types.map(({ type }) => (
-                                  <TypeBadge key={type.name} type={type.name} />
+                                {pokemon.types.map((type) => (
+                                  <TypeBadge key={type} type={type} />
                                 ))}
                               </span>
                             </span>
@@ -244,15 +236,7 @@ export function TrainerPage() {
                             <span className="list-sprite skeleton" aria-hidden="true" />
                             <span className="list-text">
                               <strong>{titleCase(entry.name)}</strong>
-                              {query?.isError && (
-                                <button
-                                  type="button"
-                                  className="text-button"
-                                  onClick={() => void query.refetch()}
-                                >
-                                  Could not load. Try again
-                                </button>
-                              )}
+                              {ready && <small>Not found in PokéAPI</small>}
                             </span>
                           </div>
                         )}

@@ -61,23 +61,6 @@ a.pokemon-card:active {
   width: 112px;
   height: 112px;
 }
-.pokemon-card-error {
-  display: grid;
-  align-content: center;
-  justify-items: start;
-  gap: 4px;
-  background: var(--surface);
-  font-size: 13px;
-  line-height: 18px;
-}
-.pokemon-card-error button {
-  min-height: 32px;
-  padding: 0;
-  border: 0;
-  background: none;
-  color: var(--accent);
-  font-size: 13px;
-}
 
 @media (min-width: 600px) {
   .pokemon-grid {

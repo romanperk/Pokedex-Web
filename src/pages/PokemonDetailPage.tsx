@@ -1,9 +1,9 @@
-import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { ArrowLeftRight, ChevronLeft, ChevronRight, Shuffle } from 'lucide-react'
 import { Link, useParams, useSearchParams } from 'react-router-dom'
 import { TopBar } from '../components/common/TopBar'
-import { ErrorState, HaloArt, LoadingState, TypeBadge } from '../components/ui'
+import { ErrorState, Fact, HaloArt, LoadingState, TypeBadge } from '../components/ui'
 import { SavePokemonButton } from '../features/collection/SavePokemonButton'
 import { rememberRecentPokemon } from '../features/pokedex/recentPokemon'
 import { MatchupList } from './MatchupList'
@@ -12,12 +12,12 @@ import {
   getPokedexFacts,
   getPokemon,
   getPokemonSpecies,
-  getPokemonSpeciesCount,
   paddedId,
   randomFactIndex,
   pokemonArtwork,
   pokemonKeys,
   pokemonSprite,
+  SPECIES_COUNT,
   statLabel,
   titleCase,
   typeVars,
@@ -43,9 +43,9 @@ const TABS = [
 type TabId = (typeof TABS)[number]['id']
 
 /** Tints the status bar to match the hero on platforms that honor theme-color. */
-function useThemeColorFrom(element: React.RefObject<HTMLElement | null>, active: boolean) {
+function useThemeColorFrom(element: React.RefObject<HTMLElement | null>, typeName?: string) {
   useEffect(() => {
-    if (!active || !element.current) return
+    if (!typeName || !element.current) return
     const metas = [...document.querySelectorAll<HTMLMetaElement>('meta[name="theme-color"]')]
     const originals = metas.map((meta) => meta.content)
     const color = getComputedStyle(element.current).backgroundColor
@@ -57,7 +57,7 @@ function useThemeColorFrom(element: React.RefObject<HTMLElement | null>, active:
         meta.content = originals[index]
       })
     }
-  }, [element, active])
+  }, [element, typeName])
 }
 
 /** True until the sheet has slid up past the Pokémon's name. The pinned hero itself never moves. */
@@ -100,15 +100,9 @@ export function PokemonDetailPage() {
     enabled: Boolean(speciesName),
     staleTime: 1000 * 60 * 60 * 24,
   })
-  const speciesCount = useQuery({
-    queryKey: pokemonKeys.speciesCount,
-    queryFn: ({ signal }) => getPokemonSpeciesCount(signal),
-    enabled: Boolean(data),
-    staleTime: 1000 * 60 * 60 * 24,
-  })
 
   const headingVisible = useIsAboveLine(sheetEdge, Boolean(data))
-  useThemeColorFrom(hero, Boolean(data))
+  useThemeColorFrom(hero, data?.types[0]?.type.name)
   usePageTitle(data ? titleCase(data.name) : 'Pokémon')
   useEffect(() => {
     if (data) rememberRecentPokemon(data)
@@ -134,7 +128,7 @@ export function PokemonDetailPage() {
 
   const label = titleCase(data.name)
   // Alternate forms use ids above 10000 and sit outside the numbered Pokédex.
-  const isNumbered = data.id <= (speciesCount.data ?? 1025)
+  const isNumbered = data.id <= SPECIES_COUNT
   const search = tab === 'about' ? '' : `?tab=${tab}`
   const genus = species.data?.genera?.find((entry) => entry.language.name === 'en')?.genus
 
@@ -187,7 +181,7 @@ export function PokemonDetailPage() {
             fallbackSrc={pokemonSprite(data.id)}
             alt={`${label} official artwork`}
           />
-          {isNumbered && data.id < (speciesCount.data ?? 1025) ? (
+          {isNumbered && data.id < SPECIES_COUNT ? (
             <Link
               className="icon-button detail-step"
               to={`/pokemon/${data.id + 1}${search}`}
@@ -253,15 +247,6 @@ export function PokemonDetailPage() {
         </div>
       </div>
     </main>
-  )
-}
-
-function Fact({ label, children }: { label: string; children: ReactNode }) {
-  return (
-    <div className="fact">
-      <dt>{label}</dt>
-      <dd>{children}</dd>
-    </div>
   )
 }
 

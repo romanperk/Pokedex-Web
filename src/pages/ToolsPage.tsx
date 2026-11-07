@@ -1,16 +1,14 @@
 import { useState } from 'react'
-import { useQueries } from '@tanstack/react-query'
 import { ArrowRight, Dices, Plus, Shapes, type LucideIcon } from 'lucide-react'
 import { Link, useNavigate } from 'react-router-dom'
 import { TopBar } from '../components/common/TopBar'
 import { PokemonSprite, TypeBadge } from '../components/ui'
-import { readComparison } from '../features/pokedex/comparison'
+import { MAX_COMPARE, readComparison } from '../features/pokedex/comparison'
 import { readGuessBest } from '../features/pokedex/guessScore'
+import { usePokemonDetails } from '../features/pokedex/usePokemonPages'
 import { readDefendingTypes, useTypeMatchups } from '../features/types/matchups'
-import { getPokemon, pokemonKeys, SPECIES_COUNT, titleCase, typeVars } from '../lib/pokeapi/client'
+import { SPECIES_COUNT, titleCase, typeVars } from '../lib/pokeapi/client'
 import { usePageTitle } from '../lib/usePageTitle'
-
-const COMPARE_SLOTS = 3
 
 /** A live preview of the types last checked, so the card answers something before it's opened. */
 function TypeEffectivenessCard() {
@@ -48,13 +46,7 @@ function TypeEffectivenessCard() {
 /** Shows the saved comparison, with open slots for what can still be added. */
 function CompareCard() {
   const [selection] = useState(readComparison)
-  const details = useQueries({
-    queries: selection.map((name) => ({
-      queryKey: pokemonKeys.detail(name),
-      queryFn: ({ signal }: { signal: AbortSignal }) => getPokemon(name, signal),
-      staleTime: 1000 * 60 * 60 * 12,
-    })),
-  })
+  const details = usePokemonDetails(selection)
   // Colored by the last Pokémon added, which keeps it distinct from the card above more often.
   const cardType = details.at(-1)?.data?.types[0]?.type.name
   return (
@@ -72,7 +64,7 @@ function CompareCard() {
         <span className="title-dot">.</span>
       </strong>
       <div className="tool-card-slots">
-        {Array.from({ length: COMPARE_SLOTS }, (_, slot) => {
+        {Array.from({ length: MAX_COMPARE }, (_, slot) => {
           const pokemon = details[slot]?.data
           return (
             <span className="tool-slot" key={slot}>

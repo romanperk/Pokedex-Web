@@ -18,28 +18,31 @@ function normalizeName(value: string) {
   return value.toLowerCase()
 }
 
+/** Reads a stored or backed-up record, or returns null when its shape is invalid. */
+function readRecord(record: unknown): CollectionEntry | null {
+  if (!record || typeof record !== 'object' || !('name' in record) || !validName(record.name))
+    return null
+  const name = normalizeName(record.name)
+  if ('owned' in record && typeof record.owned === 'boolean') return { name, owned: record.owned }
+  if (
+    'favorite' in record &&
+    typeof record.favorite === 'boolean' &&
+    'seen' in record &&
+    typeof record.seen === 'boolean' &&
+    'caught' in record &&
+    typeof record.caught === 'boolean'
+  ) {
+    // Earlier collection records were explicit additions; keep them in the new owned inventory.
+    return { name, owned: record.favorite || record.seen || record.caught }
+  }
+  return null
+}
+
 function fromStoredRecords(records: unknown[]): CollectionEntry[] {
   return mergeDuplicateEntries(
     records.flatMap((record) => {
-      if (!record || typeof record !== 'object' || !('name' in record) || !validName(record.name))
-        return []
-      if ('owned' in record && typeof record.owned === 'boolean') {
-        return record.owned ? [{ name: normalizeName(record.name), owned: true }] : []
-      }
-      if (
-        'favorite' in record &&
-        typeof record.favorite === 'boolean' &&
-        'seen' in record &&
-        typeof record.seen === 'boolean' &&
-        'caught' in record &&
-        typeof record.caught === 'boolean'
-      ) {
-        // Earlier collection records were explicit additions; keep them in the new owned inventory.
-        return record.favorite || record.seen || record.caught
-          ? [{ name: normalizeName(record.name), owned: true }]
-          : []
-      }
-      return []
+      const entry = readRecord(record)
+      return entry ? [entry] : []
     }),
   )
 }
@@ -103,18 +106,19 @@ function notify() {
   listeners.forEach((listener) => listener())
 }
 
+// Listens for the life of the app, so a save never starts from a copy another tab has outdated.
+window.addEventListener('storage', (event) => {
+  if (event.key !== STORAGE_KEY && event.key !== null) return
+  cachedValue = null
+  storageUnavailable = false
+  getSnapshot()
+  notify()
+})
+
 function subscribe(listener: () => void) {
   listeners.add(listener)
-  const onStorage = () => {
-    cachedValue = null
-    storageUnavailable = false
-    getSnapshot()
-    notify()
-  }
-  window.addEventListener('storage', onStorage)
   return () => {
     listeners.delete(listener)
-    window.removeEventListener('storage', onStorage)
   }
 }
 
@@ -142,10 +146,6 @@ export function useSavedPokemon() {
   return useCollectionEntries().map((entry) => entry.name)
 }
 
-export function isPokemonSaved(name: string) {
-  return getSnapshot().some((entry) => entry.name === normalizeName(name))
-}
-
 export function toggleSavedPokemon(name: string) {
   const normalized = normalizeName(name)
   const current = getSnapshot()
@@ -155,15 +155,6 @@ export function toggleSavedPokemon(name: string) {
     : current.filter((entry) => entry.name !== normalized)
   const persisted = persist(next)
   return { saved, persisted }
-}
-
-export function setPokemonOwned(name: string, owned: boolean) {
-  const normalized = normalizeName(name)
-  const current = getSnapshot()
-  const next = owned
-    ? [...current.filter((entry) => entry.name !== normalized), { name: normalized, owned: true }]
-    : current.filter((entry) => entry.name !== normalized)
-  return persist(next)
 }
 
 export function removeCollectionEntry(name: string) {
@@ -208,14 +199,11 @@ export function importCollection(json: string, mode: 'merge' | 'replace' = 'merg
     throw new Error('This file is not a supported Pokédex collection backup.')
   }
   if (parsed.records.length > 5000) throw new Error('This backup contains too many records.')
-  const records: CollectionEntry[] = []
   for (const [index, record] of parsed.records.entries()) {
-    const normalized = fromStoredRecords([record])
-    if (!normalized.length)
+    if (!readRecord(record))
       throw new Error(`Record ${index + 1} is invalid. No changes were imported.`)
-    records.push(...normalized)
   }
-  const importedEntries = mergeDuplicateEntries(records)
+  const importedEntries = fromStoredRecords(parsed.records)
   const result =
     mode === 'replace'
       ? importedEntries

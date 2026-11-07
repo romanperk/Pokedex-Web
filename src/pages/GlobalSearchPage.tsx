@@ -4,9 +4,10 @@ import { ChevronRight, Search, X } from 'lucide-react'
 import { Link, useSearchParams } from 'react-router-dom'
 import { TopBar } from '../components/common/TopBar'
 import { EmptyState, ErrorState, PokemonSprite } from '../components/ui'
+import { matchResources } from '../features/pokedex/matchResources'
 import {
   getCompleteResourceIndex,
-  getPokemonPage,
+  getPokemonDirectory,
   POKEMON_TYPES,
   paddedId,
   pokemonIdFromUrl,
@@ -33,28 +34,20 @@ function useSearchGroup(group: 'pokemon' | ResourceKind, term: string) {
     queryKey:
       group === 'pokemon' ? pokemonKeys.directory : [...resourceKeys.list(group), 'search-index'],
     queryFn: ({ signal }) =>
-      group === 'pokemon'
-        ? getPokemonPage(0, 2000, signal)
-        : getCompleteResourceIndex(group, signal),
+      group === 'pokemon' ? getPokemonDirectory(signal) : getCompleteResourceIndex(group, signal),
     enabled: Boolean(term),
     staleTime: 1000 * 60 * 60 * 24,
   })
   const resources: NamedResource[] = query.data?.results ?? []
-  const normalized = term.toLowerCase().replace(/\s+/g, '-').replace(/^#/, '')
-  const numericId = group === 'pokemon' && /^\d+$/.test(normalized) ? Number(normalized) : null
-  const results = resources
-    .filter(
+  const results = matchResources(
+    resources.filter(
       (resource) =>
-        (group !== 'types' ||
-          POKEMON_TYPES.includes(resource.name as (typeof POKEMON_TYPES)[number])) &&
-        (resource.name.includes(normalized) ||
-          (numericId != null && pokemonIdFromUrl(resource.url) === numericId)),
-    )
-    .sort(
-      (first, second) =>
-        Number(!first.name.startsWith(normalized)) - Number(!second.name.startsWith(normalized)) ||
-        pokemonIdFromUrl(first.url) - pokemonIdFromUrl(second.url),
-    )
+        group !== 'types' ||
+        POKEMON_TYPES.includes(resource.name as (typeof POKEMON_TYPES)[number]),
+    ),
+    term,
+    { matchId: group === 'pokemon' },
+  )
   return { query, results }
 }
 

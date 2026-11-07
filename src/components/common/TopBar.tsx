@@ -1,6 +1,6 @@
 import type { ReactNode } from 'react'
 import { ChevronLeft, Search } from 'lucide-react'
-import { Link, useLocation, useNavigate } from 'react-router-dom'
+import { Link, useNavigate } from 'react-router-dom'
 
 type TopBarProps = {
   title: ReactNode
@@ -22,9 +22,9 @@ export function TopBar({
   className = '',
 }: TopBarProps) {
   const navigate = useNavigate()
-  const location = useLocation()
   function goBack() {
-    if (location.key !== 'default') navigate(-1)
+    // React Router numbers history entries; replacing the URL keeps the number, unlike location.key.
+    if (window.history.state?.idx > 0) navigate(-1)
     else if (back) navigate(back, { replace: true })
   }
   return (

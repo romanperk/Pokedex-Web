@@ -1,5 +1,4 @@
 import { useEffect, useMemo, useState } from 'react'
-import { useQuery } from '@tanstack/react-query'
 import { Search, X } from 'lucide-react'
 import { Link, useSearchParams } from 'react-router-dom'
 import { TopBar } from '../components/common/TopBar'
@@ -11,20 +10,19 @@ import {
   PokemonSprite,
   TypeBadge,
 } from '../components/ui'
+import { matchResources } from '../features/pokedex/matchResources'
 import {
-  usePokemonCardDetails,
   usePokemonDirectory,
   usePokemonPages,
+  usePokemonSummaries,
+  type PokemonSummary,
 } from '../features/pokedex/usePokemonPages'
 import {
   friendlyError,
-  getPokemonSpeciesCount,
   POKEMON_TYPES,
-  pokemonIdFromUrl,
-  pokemonKeys,
+  SPECIES_COUNT,
   titleCase,
   typeVars,
-  type Pokemon,
 } from '../lib/pokeapi/client'
 import { useLoadMoreOnScroll } from '../lib/useLoadMoreOnScroll'
 import { usePageTitle } from '../lib/usePageTitle'
@@ -54,46 +52,36 @@ export function PokedexPage() {
 
   const list = usePokemonPages(selected, !normalizedSearch)
   const directory = usePokemonDirectory(Boolean(normalizedSearch))
-  const speciesCount = useQuery({
-    queryKey: pokemonKeys.speciesCount,
-    queryFn: ({ signal }) => getPokemonSpeciesCount(signal),
-    staleTime: 1000 * 60 * 60 * 24,
-  })
-  const searchMatches = useMemo(() => {
-    if (!settledSearch || !directory.data) return []
-    const term = settledSearch.replace(/\s+/g, '-').replace(/^#/, '')
-    const numericId = /^\d+$/.test(term) ? Number(term) : null
-    return directory.data.results
-      .filter(
-        (resource) =>
-          resource.name.includes(term) ||
-          (numericId != null && pokemonIdFromUrl(resource.url) === numericId),
-      )
-      .sort((first, second) => {
-        const firstStarts = first.name.startsWith(term) ? 0 : 1
-        const secondStarts = second.name.startsWith(term) ? 0 : 1
-        return (
-          firstStarts - secondStarts || pokemonIdFromUrl(first.url) - pokemonIdFromUrl(second.url)
-        )
+  const {
+    summaries,
+    failed: summariesFailed,
+    loading: summariesLoading,
+    retry: retrySummaries,
+  } = usePokemonSummaries()
+  const nameMatches = useMemo(
+    () =>
+      settledSearch && directory.data
+        ? matchResources(directory.data.results, settledSearch, { matchId: true })
+        : [],
+    [directory.data, settledSearch],
+  )
+  const searchMatches = selected.length
+    ? nameMatches.filter((resource) => {
+        const types = summaries.get(resource.name)?.types
+        return selected.every((type) => types?.includes(type))
       })
-  }, [directory.data, settledSearch])
+    : nameMatches
 
   const resources = normalizedSearch
     ? searchMatches.slice(0, searchLimit)
     : (list.data?.pages.flatMap((page) => page.resources) ?? [])
-  const detailQueries = usePokemonCardDetails(resources)
-  const detailsLoading = detailQueries.some((query) => query.isLoading)
-  const matchesTypes = (pokemon: Pokemon) =>
-    selected.every((type) => pokemon.types.some((item) => item.type.name === type))
-  // The paged list is already filtered by type; search results are filtered as details arrive.
-  const visibleCount = normalizedSearch
-    ? detailQueries.filter((query) => query.data && matchesTypes(query.data)).length
-    : resources.length
+  // Without the type data, a search with a type filter can't tell what matches.
+  const filterBlocked = Boolean(normalizedSearch) && selected.length > 0 && summariesFailed
 
   const hasMoreSearch = Boolean(normalizedSearch) && searchMatches.length > searchLimit
   const hasMoreList = !normalizedSearch && Boolean(list.hasNextPage)
   const canLoadMore = hasMoreSearch
-    ? !searchPending && !detailsLoading
+    ? !searchPending
     : hasMoreList && !list.isFetchingNextPage && !list.isFetchNextPageError
   const sentinel = useLoadMoreOnScroll(
     () => {
@@ -145,7 +133,9 @@ export function PokedexPage() {
     )
   }
 
-  const searching = normalizedSearch && (searchPending || directory.isLoading || detailsLoading)
+  const searching =
+    normalizedSearch &&
+    (searchPending || directory.isLoading || (selected.length > 0 && summariesLoading))
   const total = normalizedSearch ? searchMatches.length : list.data?.pages[0]?.total
   const summary = normalizedSearch
     ? searching
@@ -155,7 +145,7 @@ export function PokedexPage() {
       ? ''
       : selected.length
         ? `${total.toLocaleString()} ${total === 1 ? 'match' : 'matches'}`
-        : `${(speciesCount.data ?? total).toLocaleString()} species, plus alternate forms`
+        : `${SPECIES_COUNT.toLocaleString()} species, plus alternate forms`
 
   return (
     <main className="page pokedex">
@@ -225,24 +215,16 @@ export function PokedexPage() {
             onRetry={() => void directory.refetch()}
           />
         )}
+        {summariesFailed && (resources.length > 0 || filterBlocked) && (
+          <ErrorState message="Pokémon details could not load." onRetry={retrySummaries} />
+        )}
         {!normalizedSearch && list.isLoading && <LoadingState label="Loading Pokémon" />}
 
         <div className="pokemon-grid">
-          {resources.map((resource, index) => {
-            const query = detailQueries[index]
-            if (query?.data)
-              return matchesTypes(query.data) || !normalizedSearch ? (
-                <PokemonCard key={resource.name} pokemon={query.data} />
-              ) : null
-            if (query?.isError)
-              return (
-                <div className="pokemon-card pokemon-card-error" key={resource.name} role="alert">
-                  <span>{titleCase(resource.name)} could not load</span>
-                  <button type="button" onClick={() => void query.refetch()}>
-                    Try again
-                  </button>
-                </div>
-              )
+          {resources.map((resource) => {
+            const pokemon = summaries.get(resource.name)
+            if (pokemon) return <PokemonCard key={resource.name} pokemon={pokemon} />
+            if (summariesFailed) return null
             return <div className="pokemon-card skeleton" key={resource.name} aria-hidden="true" />
           })}
         </div>
@@ -250,8 +232,8 @@ export function PokedexPage() {
         {normalizedSearch &&
           !searching &&
           directory.data &&
-          visibleCount === 0 &&
-          !hasMoreSearch && (
+          searchMatches.length === 0 &&
+          !filterBlocked && (
             <EmptyState title={`No Pokémon match “${search.trim()}”`}>
               {selected.length ? 'Try removing a type filter.' : 'Try part of a name or a number.'}
             </EmptyState>
@@ -268,28 +250,26 @@ export function PokedexPage() {
           />
         )}
         <div ref={sentinel} className="scroll-sentinel" aria-hidden="true" />
-        {(hasMoreSearch || hasMoreList) && (list.isFetchingNextPage || detailsLoading) && (
-          <LoadingState label="Loading more" />
-        )}
+        {hasMoreList && list.isFetchingNextPage && <LoadingState label="Loading more" />}
       </div>
     </main>
   )
 }
 
-function PokemonCard({ pokemon }: { pokemon: Pokemon }) {
+function PokemonCard({ pokemon }: { pokemon: PokemonSummary }) {
   return (
     <Link
       className="pokemon-card"
       to={`/pokemon/${pokemon.name}`}
-      style={typeVars(pokemon.types[0]?.type.name)}
+      style={typeVars(pokemon.types[0])}
     >
       <span className="pokemon-card-head">
         <strong>{titleCase(pokemon.name)}</strong>
         <DexNumber id={pokemon.id} />
       </span>
       <span className="pokemon-card-types">
-        {pokemon.types.map(({ type }) => (
-          <TypeBadge key={type.name} type={type.name} />
+        {pokemon.types.map((type) => (
+          <TypeBadge key={type} type={type} />
         ))}
       </span>
       <PokemonSprite id={pokemon.id} className="pokemon-card-sprite" />

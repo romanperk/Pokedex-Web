@@ -1,4 +1,4 @@
-import { useMemo, useState, type ReactNode } from 'react'
+import { useMemo, useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { ChevronRight, Search, X } from 'lucide-react'
 import { Link, useParams } from 'react-router-dom'
@@ -6,11 +6,13 @@ import { TopBar } from '../components/common/TopBar'
 import {
   EmptyState,
   ErrorState,
+  Fact,
   LoadingState,
   PokemonImage,
   PokemonSprite,
   TypeBadge,
 } from '../components/ui'
+import { normalizeSearchTerm } from '../features/pokedex/matchResources'
 import {
   formatGeneration,
   friendlyError,
@@ -37,10 +39,6 @@ const collections: Record<ResourceKind, { title: string; singular: string }> = {
 
 const LIST_BATCH = 40
 
-function isResourceKind(value: string): value is ResourceKind {
-  return Object.hasOwn(collections, value)
-}
-
 export function ReferenceIndexPage({ kind }: { kind: ResourceKind }) {
   const collection = collections[kind]
   usePageTitle(collection.title)
@@ -52,7 +50,7 @@ export function ReferenceIndexPage({ kind }: { kind: ResourceKind }) {
     staleTime: 1000 * 60 * 60 * 24,
   })
   const resources = useMemo(() => {
-    const normalized = term.trim().toLowerCase().replace(/\s+/g, '-')
+    const normalized = normalizeSearchTerm(term)
     return (query.data?.results ?? []).filter(
       (resource) =>
         (kind !== 'types' ||
@@ -223,7 +221,9 @@ function ReferenceRecord({ kind, data }: { kind: ResourceKind; data: ResourceDet
           (description ? (
             <p className="reference-description">{description}</p>
           ) : (
-            <p className="note">No English description is listed for this {kind.slice(0, -1)}.</p>
+            <p className="note">
+              No English description is listed for this {collections[kind].singular.toLowerCase()}.
+            </p>
           ))}
 
         {kind === 'moves' && <MoveFacts data={data} />}
@@ -270,15 +270,6 @@ function ReferenceRecord({ kind, data }: { kind: ResourceKind; data: ResourceDet
         )}
       </div>
     </main>
-  )
-}
-
-function Fact({ label, children }: { label: string; children: ReactNode }) {
-  return (
-    <div className="fact">
-      <dt>{label}</dt>
-      <dd>{children}</dd>
-    </div>
   )
 }
 
@@ -483,12 +474,4 @@ function TypeMoves({ moves }: { moves: NamedResource[] }) {
       />
     </section>
   )
-}
-
-export function ReferenceRoute({ kind }: { kind: string }) {
-  return isResourceKind(kind) ? <ReferenceIndexPage key={kind} kind={kind} /> : null
-}
-
-export function ReferenceDetailRoute({ kind }: { kind: string }) {
-  return isResourceKind(kind) ? <ReferenceDetailPage kind={kind} /> : null
 }

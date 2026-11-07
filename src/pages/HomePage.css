@@ -46,7 +46,7 @@
   display: grid;
   grid-template-columns: minmax(0, 1fr) 176px;
   gap: 0 0;
-  min-height: 216px;
+  min-height: 290px;
   margin-top: 16px;
   padding: 16px;
   overflow: hidden;
@@ -56,6 +56,15 @@
 .featured:active {
   transform: scale(0.99);
 }
+/* The name gets the full width: the column beside the artwork is too narrow for long words. */
+.featured-head {
+  position: relative;
+  z-index: 1;
+  display: grid;
+  grid-column: 1 / -1;
+  justify-items: start;
+  gap: 4px;
+}
 .featured-copy {
   position: relative;
   z-index: 1;
@@ -63,6 +72,7 @@
   align-content: start;
   justify-items: start;
   gap: 4px;
+  margin-top: 4px;
 }
 .featured-label {
   font-size: 13px;
@@ -80,7 +90,7 @@
 }
 .featured-art {
   width: 216px;
-  margin: -8px -24px 0 -16px;
+  margin: -20px -24px 0 -16px;
 }
 .featured-text {
   grid-column: 1 / -1;

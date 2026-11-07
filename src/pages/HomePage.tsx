@@ -87,12 +87,14 @@ function FeaturedPokemon() {
       to={`/pokemon/${data.name}`}
       style={typeVars(data.types[0]?.type.name)}
     >
-      <div className="featured-copy">
+      <div className="featured-head">
         <span className="featured-label">Pokémon of the day</span>
         <strong className="featured-name">
           {titleCase(data.name)}
           <span className="title-dot">.</span>
         </strong>
+      </div>
+      <div className="featured-copy">
         <DexNumber id={data.id} />
         <span className="type-row">
           {data.types.map(({ type }) => (
